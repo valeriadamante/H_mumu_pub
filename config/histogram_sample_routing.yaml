@@ -1,0 +1,31 @@
+jet_gen_components:
+  enabled_processes:
+    - DY
+    - DYto2Mu_MLL105To160
+    - DYto2Mu_MLL105To160_VBFFiltered
+    - EWK
+    - EWK_LLJJ_herwig
+    - EWK_LLJJ_pythia
+    - EWK_2Mu2J_MLL_105to160_herwig
+    - DYto2L_M_50_0J_amcatnloFXFX
+    - DYto2L_M_50_1J_amcatnloFXFX
+    - DYto2L_M_50_2J_amcatnloFXFX
+    - DYto2Mu_M_50_0J_amcatnloFXFX
+    - DYto2Mu_M_50_1J_amcatnloFXFX
+    - DYto2Mu_M_50_2J_amcatnloFXFX
+
+mass_region_routing:
+  early:
+    eras: [Run3_2022, Run3_2022EE, Run3_2023, Run3_2023BPix]
+    Signal_Fit: [DY_amcatnlo_105_160, EWK_105_160]
+    H_sideband: [DY_amcatnlo_105_160, EWK_105_160]
+    sidebands: [DY_amcatnlo, EWK]
+    separate: [DY_012J]
+  late:
+    eras: [Run3_2024, Run3_2025, Run3_2026]
+    # DY_amcatnlo_105_160 resolves to the complementary inclusive and
+    # VBF-filtered samples using GenVBFFilter==0/1.
+    Signal_Fit: [DY_amcatnlo_105_160, EWK_105_160]
+    H_sideband: [DY_amcatnlo_105_160, EWK_105_160]
+    sidebands: [DY_amcatnlo, EWK]
+    separate: [DY_012J]

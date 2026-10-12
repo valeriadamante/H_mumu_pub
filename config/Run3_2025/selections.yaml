@@ -1,0 +1,183 @@
+
+muon_pt_default_suffix: FSR_corr
+muon_pt_min: 10.0
+dimuon_mass_min: 50
+dimuon_mass_max: 200
+apply_trg_filter: True
+only_default: True
+
+jet_pt_min: 25.0
+jet_eta_max: 4.7
+jet_horn_veto_expr: "( ( abs(v_ops::eta(Jet_p4)) >= 2.5 && abs(v_ops::eta(Jet_p4)) < 3.0) && v_ops::pt(Jet_p4) <= 50.0 )"
+apply_jetveto_filter: False
+define_electron_cleaning: False
+
+masses_regions:
+    Z_sideband:
+      expression: "m_mumu{mu_suff} > 70 && m_mumu{mu_suff} < 110"
+      store: True
+    Signal_Fit:
+      expression: "m_mumu{mu_suff} > 115 && m_mumu{mu_suff} < 135"
+      store: True
+    H_sideband:
+      expression: "((m_mumu{mu_suff} > 110 && m_mumu{mu_suff} < 115) || (m_mumu{mu_suff} > 135 && m_mumu{mu_suff} < 150))"
+      store: True
+    Signal_ext:
+      expression: "m_mumu{mu_suff} > 110 && m_mumu{mu_suff} < 150"
+      store: True
+    mass_inclusive:
+      expression: "m_mumu{mu_suff} > 60 && m_mumu{mu_suff} < 150"
+      store: True
+
+muon_presel_pt_cut: 10.0
+dimuon_m_cut: 50.0
+
+# =============================================================================
+# MUONS SELECTION PIPELINE
+# =============================================================================
+muons_selection:
+  muon_pre_sel_check:
+    expression: "mu1_pt_raw_noCorr > 10 && abs(mu1_eta_raw_noCorr) < 2.4 && mu2_pt_raw_noCorr > 10 && abs(mu2_eta_raw_noCorr) < 2.4"
+    store: True
+  muons_OS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} < 0"
+    store: True
+  muons_OS_and_presel:
+    expression: "muon_pre_sel_check{mu_suff} && muons_OS{mu_suff}"
+    store: True
+  muons_trigger:
+    expression: "( Event_HasTriggerMatching_singleMu{mu_suff} && HLT_IsoMu24 && ( mu1_HasTriggerMatching_singleMu{mu_suff} || mu2_HasTriggerMatching_singleMu{mu_suff} ) ) "
+    store: True
+  muons_OS_presel_trg:
+    expression: "muons_OS_and_presel{mu_suff} && muons_trigger{mu_suff}"
+    store: True
+  muons_SS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} > 0"
+    store: True
+  muons_SS_presel_trg:
+    expression: "muon_pre_sel_check{mu_suff} && muons_SS{mu_suff} && muons_trigger{mu_suff}"
+    store: True
+  mu1_pt_l30:
+    expression: "mu1_pt{mu_suff} < 30"
+    store: False
+  mu2_pt_l30:
+    expression: "mu2_pt{mu_suff} < 30"
+    store: False
+  mu1_pt_g20:
+    expression: "mu1_pt{mu_suff} > 20"
+    store: False
+  mu2_pt_g20:
+    expression: "mu2_pt{mu_suff} > 20"
+    store: True
+  mu1_pt_g26:
+    expression: "mu1_pt{mu_suff} > 26"
+    store: True
+  mu_pt_sel:
+    expression: "mu1_pt_g26{mu_suff} && mu2_pt_g20{mu_suff}"
+    store: True
+  mu_pt_trg_sel:
+    expression: "mu_pt_sel{mu_suff} && muons_trigger{mu_suff}"
+    store: True
+  mu1_ML:
+    expression: "mu1_pfIsoId{mu_suff} >= 2 && mu1_mediumId{mu_suff}"
+    store: False
+  mu1_LL:
+    expression: "mu1_pfIsoId{mu_suff} >= 2 && mu1_looseId{mu_suff}"
+    store: False
+  mu1_TT:
+    expression: "mu1_pfIsoId{mu_suff} >= 4 && mu1_tightId{mu_suff}"
+    store: False
+  mu2_ML:
+    expression: "mu2_pfIsoId{mu_suff} >= 2 && mu2_mediumId{mu_suff}"
+    store: False
+  mu2_LL:
+    expression: "mu2_pfIsoId{mu_suff} >= 2 && mu2_looseId{mu_suff}"
+    store: False
+  mu2_TT:
+    expression: "mu2_pfIsoId{mu_suff} >= 4 && mu2_tightId{mu_suff}"
+    store: False
+  bothMuons_ML:
+    expression: "mu1_ML{mu_suff} && mu2_ML{mu_suff}"
+    store: True
+  bothMuons_LL:
+    expression: "mu1_LL{mu_suff} && mu2_LL{mu_suff}"
+    store: False
+  chi2_sel:
+    expression: "mu1_bsConstrainedChi2{mu_suff} < 30 && mu2_bsConstrainedChi2{mu_suff} < 30"
+    store: True
+  pt_lessthan30_and_TT:
+    expression: "(((mu1_pt_l30{mu_suff} && mu1_TT{mu_suff}) || !(mu1_pt_l30{mu_suff})) && ((mu2_pt_l30{mu_suff} && mu2_TT{mu_suff}) || !(mu2_pt_l30{mu_suff})))"
+    store: True
+
+# =============================================================================
+# JETS SELECTION PIPELINE (Systematics tracking structure)
+# =============================================================================
+jets_selection:
+  # Counts how many jets pass the external regional cross-cleaning and horn veto requirements
+  has_good_jets:
+    expression: "N_SelectedJets{jet_suff} >= 0"
+    store: True
+  # JetTagSel passively checks the conditions on the loose/medium b-tagger thresholds
+  jets_btag_clean_sel:
+    expression: "SelectedJetTagSel{jet_suff}"
+    store: True
+
+categories:
+  base_sel:
+    expression: "muons_OS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && SelectedJetTagSel{jet_suff}"
+    store: True
+  baseline:
+    expression: "base_sel{tot_suff} && mu1_ML{mu_suff} && mu2_ML{mu_suff} && pt_lessthan30_and_TT{mu_suff}"
+    store: True
+  base_sel_SS:
+    expression: "muons_SS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && SelectedJetTagSel{jet_suff}"
+    store: True
+  baseline_SS:
+    expression: "base_sel_SS{tot_suff} && mu1_ML{mu_suff} && mu2_ML{mu_suff} && pt_lessthan30_and_TT{mu_suff}"
+    store: True
+  baseline_chi2:
+    expression: "baseline{tot_suff} && chi2_sel{mu_suff}"
+    store: True
+
+  # VBF definition without any logic hidden in the C++
+  VBF_def:
+    expression: "HasVBF{jet_suff} && SelectedJet_pt{jet_suff}[VBFJetIdx_1{jet_suff}] >= 35 && SelectedJet_pt{jet_suff}[VBFJetIdx_2{jet_suff}] >= 25"
+    store: True
+
+  VBF:
+    expression: "baseline{tot_suff} && VBF_def{tot_suff}"
+    store: True
+  ggF:
+    expression: "baseline{tot_suff} && !(VBF_def{tot_suff})"
+    store: True
+  ggF_0J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 0"
+    store: True
+  ggF_1J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 1"
+    store: True
+  ggF_2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 2"
+    store: True
+  # baseline with >= 2 selected jets = ggF_ge2J + VBF_ge2J (VBF_def needs two jets).
+  baseline_ge2J:
+    expression: "baseline{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: True
+  ggF_ge2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: True
+  VBF_ge2J:
+    expression: "VBF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: True
+  ggF_Z_0J:
+    expression: "ggF_0J{tot_suff}"
+    store: True
+  ggF_Z_1J:
+    expression: "ggF_1J{tot_suff}"
+    store: True
+  ggF_Z_ge2J:
+    expression: "ggF_ge2J{tot_suff}"
+    store: True
+  VBF_Z_ge2J:
+    expression: "VBF_ge2J{tot_suff}"
+    store: True

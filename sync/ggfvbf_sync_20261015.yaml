@@ -1,0 +1,53 @@
+name: ggfvbf_20261015
+era: Run3_2024
+repository: https://github.com/valeriadamante/Hmumu_analysis
+implementation: sync/python/special_sync_skim.py
+
+datasets:
+  data:
+    - Muon0_Run2024H
+    - Muon1_Run2024H
+  ggF_VBF:
+    - VBFHto2Mu_M125_powheg
+    - GluGluHto2Mu
+  ttH_VH:
+    - TTH_Hto2Mu
+    - ZH_Hto2Mu
+    - WplusH_Hto2Mu
+
+preselection:
+  dimuon_mass: "50 < m(mu,mu; NanoAOD Muon_pt/eta/phi/mass) < 200 GeV"
+  raw_muon_pt:
+    data_ggF_VBF: "> 20 GeV for both selected muons"
+    ttH_VH: "> 10 GeV for both selected muons"
+  pairing: "two highest-Muon_pt muons passing the channel threshold"
+  other_event_filters: none
+
+objects:
+  muons: "standard ScaRe and FSR code; raw and corrected values both stored"
+  jets: "standard JEC/JER, jet ID, veto-map, horn and lepton-cleaning code"
+  fatjets: "NanoAOD FatJet collection stored for ZH/WH, including raw pT"
+  met: PuppiMET
+  btag:
+    algorithm: UParTAK4
+    loose_wp: 0.0246
+    medium_wp: 0.1272
+    tight_wp: 0.4648
+
+flags_not_filters:
+  - golden JSON
+  - trigger and trigger matching
+  - muon charge, identification and isolation
+  - electron veto
+  - b-tag veto
+  - MET filters
+  - jet quality, veto map and horn decisions
+  - mass regions and ggF/VBF categories
+
+weights:
+  stored_separately: [generator, pileup, muon_ID_isolation_tracking, trigger]
+  excluded: [DY_reweighting, dimuon_pt_reweighting]
+
+output:
+  root: /eos/cms/store/group/phys_higgs/cmshmm/run3_sync
+  layout: "{GROUPNAME}-{DATASETNAME}/sync_tuple.root"

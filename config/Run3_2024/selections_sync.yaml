@@ -1,0 +1,193 @@
+# Nominal selections for the compact 2024 synchronization tuple.
+# Unlike the production baseline, this sync baseline has no low-pT tight-tight
+# requirement. These expressions are evaluated again from skim-level columns.
+# Muon pT cuts of the sync (as Pisa): leading > 26 GeV, subleading > 20 GeV, on
+# the raw pT (mu*_pt_raw_noCorr: no ScaRe, no FSR). The same cuts on the
+# corrected pT (mu*_pt_g26, mu2_pt_g20) are kept as flags for comparison.
+
+masses_regions:
+  Z_sideband:
+    expression: "dimuon_mass > 70 && dimuon_mass < 110"
+    store: true
+  Signal_Fit:
+    expression: "dimuon_mass > 115 && dimuon_mass < 135"
+    store: true
+  H_sideband:
+    expression: "(dimuon_mass > 110 && dimuon_mass < 115) || (dimuon_mass > 135 && dimuon_mass < 150)"
+    store: true
+  Signal_ext:
+    expression: "dimuon_mass > 110 && dimuon_mass < 150"
+    store: true
+  mass_inclusive:
+    expression: "dimuon_mass > 60 && dimuon_mass < 150"
+    store: true
+  Z_CR_H_SB:
+    expression: "(dimuon_mass > 76 && dimuon_mass < 115) || (dimuon_mass > 130 && dimuon_mass < 150)"
+    store: true
+  # Loose window of the sync tuple; it coincides with the skim dimuon mass cut.
+  mass_50_200:
+    expression: "dimuon_mass > 50 && dimuon_mass < 200"
+    store: true
+
+muons_selection:
+  muon_pre_sel_check:
+    expression: "mu1_pt_raw_noCorr > 10 && abs(mu1_eta_raw_noCorr) < 2.4 && mu2_pt_raw_noCorr > 10 && abs(mu2_eta_raw_noCorr) < 2.4"
+    store: true
+  muons_OS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} < 0"
+    store: true
+  muons_SS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} > 0"
+    store: false
+  muons_trigger:
+    expression: "Event_HasTriggerMatching_singleMu{mu_suff} && HLT_IsoMu24 && (mu1_HasTriggerMatching_singleMu{mu_suff} || mu2_HasTriggerMatching_singleMu{mu_suff})"
+    store: true
+  muons_OS_presel_trg:
+    expression: "muon_pre_sel_check{mu_suff} && muons_OS{mu_suff} && muons_trigger{mu_suff}"
+    store: false
+  muons_SS_presel_trg:
+    expression: "muon_pre_sel_check{mu_suff} && muons_SS{mu_suff} && muons_trigger{mu_suff}"
+    store: false
+  mu1_rawpt_g26:
+    expression: "mu1_pt_raw_noCorr > 26"
+    store: true
+  mu2_rawpt_g20:
+    expression: "mu2_pt_raw_noCorr > 20"
+    store: true
+  mu_rawpt_sel:
+    expression: "mu1_rawpt_g26 && mu2_rawpt_g20"
+    store: true
+  mu1_pt_g26:
+    expression: "mu1_pt{mu_suff} > 26"
+    store: true
+  mu2_pt_g20:
+    expression: "mu2_pt{mu_suff} > 20"
+    store: true
+  mu2_pt_g26:
+    expression: "mu2_pt{mu_suff} > 26"
+    store: true
+  mu_pt_sel:
+    expression: "mu1_pt_g26{mu_suff} && mu2_pt_g20{mu_suff}"
+    store: false
+  mu1_ML:
+    expression: "mu1_pfIsoId{mu_suff} >= 2 && mu1_mediumId{mu_suff}"
+    store: true
+  mu2_ML:
+    expression: "mu2_pfIsoId{mu_suff} >= 2 && mu2_mediumId{mu_suff}"
+    store: true
+  bothMuons_ML:
+    expression: "mu1_ML{mu_suff} && mu2_ML{mu_suff}"
+    store: true
+  chi2_sel:
+    expression: "mu1_bsConstrainedChi2{mu_suff} < 30 && mu2_bsConstrainedChi2{mu_suff} < 30"
+    store: true
+
+jets_selection:
+  has_good_jets:
+    expression: "N_SelectedJets{jet_suff} >= 0"
+    store: true
+  jets_btag_clean_sel:
+    expression: "SelectedJetTagSel{jet_suff}"
+    store: true
+
+categories:
+  base_sel_muons:
+    expression: "muons_OS_presel_trg{mu_suff} && mu_rawpt_sel{mu_suff} && bothMuons_ML{mu_suff}"
+    store: true
+  baseline:
+    expression: "base_sel_muons{tot_suff} && SelectedJetTagSel{jet_suff}"
+    store: true
+  base_sel_SS:
+    expression: "muons_SS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && SelectedJetTagSel{jet_suff}"
+    store: false
+  baseline_SS:
+    expression: "base_sel_SS{tot_suff} && bothMuons_ML{mu_suff}"
+    store: false
+  baseline_chi2:
+    expression: "baseline{tot_suff} && chi2_sel{mu_suff}"
+    store: false
+  VBF_def:
+    expression: "HasVBF{jet_suff} && VBFJetIdx_1{jet_suff} >= 0 && VBFJetIdx_2{jet_suff} >= 0 && static_cast<size_t>(VBFJetIdx_1{jet_suff}) < SelectedJet_pt{jet_suff}.size() && static_cast<size_t>(VBFJetIdx_2{jet_suff}) < SelectedJet_pt{jet_suff}.size() && SelectedJet_pt{jet_suff}.at(VBFJetIdx_1{jet_suff}) >= 35 && SelectedJet_pt{jet_suff}.at(VBFJetIdx_2{jet_suff}) >= 25"
+    store: true
+  VBF:
+    expression: "baseline{tot_suff} && VBF_def{tot_suff}"
+    store: true
+  ggF:
+    expression: "baseline{tot_suff} && !VBF_def{tot_suff}"
+    store: true
+  ggF_0J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 0"
+    store: true
+  ggF_1J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 1"
+    store: true
+  ggF_2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 2"
+    store: true
+  ggF_ge2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+  VBF_ge2J:
+    expression: "VBF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+  # Same chain with the muon cuts 26/20 GeV on the corrected (ScaRe + FSR) pT
+  # instead of the raw pT. Not stored, so the tuple keeps the nominal column set.
+  base_sel_muons_mu2_20:
+    expression: "muons_OS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && bothMuons_ML{mu_suff}"
+    store: false
+  baseline_mu2_20:
+    expression: "base_sel_muons_mu2_20{tot_suff} && SelectedJetTagSel{jet_suff}"
+    store: false
+  VBF_mu2_20:
+    expression: "baseline_mu2_20{tot_suff} && VBF_def{tot_suff}"
+    store: false
+
+# Cumulative analysis steps appended after the skim report JSON cutflow.
+# Do not place mutually exclusive categories (for example VBF then ggF) here.
+cutflow:
+  - base_sel_muons
+  - baseline
+  - mass_inclusive
+
+# Granular cumulative cutflow from the skim report down to the VBF category in
+# the Z control region plus H sideband. The VBF steps split HasVBF into the
+# horn cleaning, the 35/25 GeV jet pT, the 400 GeV dijet mass and the 2.5
+# pseudorapidity gap, in the order FindVBFJets applies them.
+cutflow_vbf_Z_CR_H_SB:
+  - muon_pre_sel_check
+  - muons_OS
+  - muons_trigger
+  - mu1_rawpt_g26
+  - mu2_rawpt_g20
+  - bothMuons_ML
+  - base_sel_muons
+  - jets_btag_clean_sel
+  - baseline
+  - jets_ge2
+  - vbf_jets_ge2
+  - vbf_pair_pt
+  - vbf_pair_mjj
+  - vbf_pair_deta
+  - VBF_def
+  - VBF
+  - Z_CR_H_SB
+
+# Same chain with the muon cuts 26/20 GeV on the corrected (ScaRe + FSR) pT.
+cutflow_vbf_Z_CR_H_SB_mu2_20:
+  - muon_pre_sel_check
+  - muons_OS
+  - muons_trigger
+  - mu1_pt_g26
+  - mu2_pt_g20
+  - bothMuons_ML
+  - base_sel_muons_mu2_20
+  - jets_btag_clean_sel
+  - baseline_mu2_20
+  - jets_ge2
+  - vbf_jets_ge2
+  - vbf_pair_pt
+  - vbf_pair_mjj
+  - vbf_pair_deta
+  - VBF_def
+  - VBF_mu2_20
+  - Z_CR_H_SB

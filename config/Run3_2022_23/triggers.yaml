@@ -1,0 +1,10 @@
+singleMu:
+  path:
+    - HLT_IsoMu24
+  legs:
+    - offline_obj:
+        cut: "{obj}_{pt} > 26"
+      online_obj:
+        cut: TrigObj_id == 13 && (TrigObj_filterBits&8)!=0
+      doMatching: True
+      jsonTRGcorrection_key: NUM_IsoMu24_DEN_CutBasedIdMedium_and_PFIsoMedium

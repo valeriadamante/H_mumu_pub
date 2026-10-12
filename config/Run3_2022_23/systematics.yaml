@@ -1,0 +1,266 @@
+scales:
+  - up
+  - down
+
+qcd_scale:
+  enabled: true
+  name: "QCDscale_{process}"
+  branch: "LHEScaleWeight"
+  prescription: "six_point_bin_envelope"
+  missing_branch: "unity"
+  missing_sums: "skip"
+  process_labels:
+    DY: "V"
+    DYto2Mu_MLL105To160: "V"
+    DYto2Mu_MLL105To160_nonStitched: "V"
+    DYto2Mu_MLL105To160_VBFFiltered: "V"
+    DYto2Mu_MLL105To160_VBFFiltered_nonStitched: "V"
+    DYto2Mu_MLL105To160_FlashSim: "V"
+    DYto2Mu_FlashSim: "V"
+    DYto2L_FlashSim: "V"
+    DYto2Mu_minnlo: "V"
+    W: "V"
+    W_NJets: "V"
+    TT: "ttbar"
+    TTto2L2Nu_Flashsim: "ttbar"
+    ST: "ttbar"
+    TW: "ttbar"
+    TTX: "ttbar"
+    EWK: "V"
+    EWK_2Mu2J_MLL_105to160_herwig: "V"
+    EWK_2Mu2J_MLL_105to160_pythia: "V"
+    EWK_2Mu2J_MLL_105to160_pythia_Flashsim: "V"
+    VV: "VV"
+    VV_Inclusive: "VV"
+    VVV: "VVV"
+    VBFHto2Mu_M125_amcatnlo: "qqH"
+    VBFHto2Mu_M125_powheg: "qqH"
+    VBFHto2Mu_m125_Flashsim: "qqH"
+    VBFHto2Mu_m120: "qqH"
+    VBFHto2Mu_m130: "qqH"
+    VBFHto2Mu_m125_tuneDown: "qqH"
+    VBFHto2Mu_m125_tuneUp: "qqH"
+    GluGluHto2Mu: "ggH"
+    GluGluHto2Mu_amcatnlo: "ggH"
+    GluGluHto2Mu_MiNNLO: "ggH"
+    GluGluHto2Mu_tuneDown: "ggH"
+    GluGluHto2Mu_tuneUp: "ggH"
+    GluGluHto2Mu_M120: "ggH"
+    GluGluHto2Mu_M130: "ggH"
+    VHto2Mu: "VH"
+    VH_inclusive: "VH"
+    TTHto2Mu: "ttH"
+    TTH_inclusive: "ttH"
+    SingleH: "VH"
+  variations:
+    - {name: "QCD_ren_scale_{process}", down: "muR0p5_muF1", up: "muR2_muF1"}
+    - {name: "QCD_fac_scale_{process}", down: "muR1_muF0p5", up: "muR1_muF2"}
+  points:
+    - {name: "muR0p5_muF0p5", index: 0}
+    - {name: "muR0p5_muF1", index: 1}
+    - {name: "muR1_muF0p5", index: 3}
+    - {name: "muR1_muF2", index: 5}
+    - {name: "muR2_muF1", index: 7}
+    - {name: "muR2_muF2", index: 8}
+
+derived_systematics:
+  EWKHerwigPythia:
+    name: "CMS_hmm_EWKZ_partonShower"
+    nominal_process: "EWK_2Mu2J_MLL_105to160_herwig"
+    alternative_process: "EWK_2Mu2J_MLL_105to160_pythia"
+    coefficient: 0.5
+    floor: 0.0
+
+pdf:
+  enabled: true
+  branch: "LHEPdfWeight"
+  prescription: "replicas_rms"
+  nominal_index: 0
+  replica_start: 1
+  replica_count: 100
+  missing_branch: "unity"
+  process_labels:
+    DY: "qqbar"
+    DYto2Mu_MLL105To160: "qqbar"
+    DYto2Mu_MLL105To160_nonStitched: "qqbar"
+    DYto2Mu_MLL105To160_VBFFiltered: "qqbar"
+    DYto2Mu_MLL105To160_VBFFiltered_nonStitched: "qqbar"
+    DYto2Mu_MLL105To160_FlashSim: "qqbar"
+    DYto2Mu_FlashSim: "qqbar"
+    DYto2L_FlashSim: "qqbar"
+    DYto2Mu_minnlo: "qqbar"
+    W: "qqbar"
+    W_NJets: "qqbar"
+    TT: "gg"
+    TTto2L2Nu_Flashsim: "gg"
+    ST: "gq"
+    TW: "gq"
+    TTX: "gg"
+    EWK: "qqbar"
+    EWK_2Mu2J_MLL_105to160_herwig: "qqbar"
+    EWK_2Mu2J_MLL_105to160_pythia: "qqbar"
+    EWK_2Mu2J_MLL_105to160_pythia_Flashsim: "qqbar"
+    VV: "qqbar"
+    VV_Inclusive: "qqbar"
+    VVV: "qqbar"
+    VBFHto2Mu_M125_amcatnlo: "Higgs_qqH"
+    VBFHto2Mu_M125_powheg: "Higgs_qqH"
+    VBFHto2Mu_m125_Flashsim: "Higgs_qqH"
+    VBFHto2Mu_m120: "Higgs_qqH"
+    VBFHto2Mu_m130: "Higgs_qqH"
+    VBFHto2Mu_m125_tuneDown: "Higgs_qqH"
+    VBFHto2Mu_m125_tuneUp: "Higgs_qqH"
+    GluGluHto2Mu: "Higgs_ggH"
+    GluGluHto2Mu_amcatnlo: "Higgs_ggH"
+    GluGluHto2Mu_MiNNLO: "Higgs_ggH"
+    GluGluHto2Mu_tuneDown: "Higgs_ggH"
+    GluGluHto2Mu_tuneUp: "Higgs_ggH"
+    GluGluHto2Mu_M120: "Higgs_ggH"
+    GluGluHto2Mu_M130: "Higgs_ggH"
+    VHto2Mu: "Higgs_VH"
+    VH_inclusive: "Higgs_VH"
+    TTHto2Mu: "Higgs_ttH"
+    TTH_inclusive: "Higgs_ttH"
+    SingleH: "Higgs_VH"
+
+
+systematics:
+  Central:
+    muon_suffix: ""
+    jet_suffix: ""
+    weight: "weight__Central"
+    name: ""
+
+  JER:
+    components: [JEReta0pt0, JEReta1pt0, JEReta2pt0, JEReta2pt1, JEReta3pt0, JEReta3pt1]
+    muon_suffix: ""
+    jet_suffix: "_JER{scale}"
+    weight: "weight__Central"
+    name: "CMS_res_j_{era}"
+
+  JES_Total:
+    muon_suffix: ""
+    jet_suffix: "_JESTotal{scale}"
+    weight: "weight__Central"
+    name: "CMS_scale_j_{era}"
+
+  MuonScale:
+    jet_suffix: ""
+    muon_suffix: "_FSR_scale_{scale}"
+    weight: "weight__Central"
+    name: "CMS_scale_m_{era}"
+
+  MuonRes:
+    jet_suffix: ""
+    muon_suffix: "_FSR_res_{scale}"
+    weight: "weight__Central"
+    name: "CMS_res_m_{era}"
+
+weights:
+  Central:
+    name: ""
+    muon_suffix: ""
+    jet_suffix: ""
+    weight: "weight__Central"
+    expression: >
+      genWeight *
+      weight_lumi *
+      weight_xs *
+      weight_pu *
+      weight_mu1_LoosePFIso_MediumID_Central *
+      weight_mu1_MediumID_Trk_Central *
+      weight_mu2_LoosePFIso_MediumID_Central *
+      weight_mu2_MediumID_Trk_Central *
+      weight_TrgSF_singleMu_IsoMu24Central
+
+  # QCD renormalization/factorization scales: unnormalized 6-point envelope.
+  QCDScale_{scale}:
+    jet_suffix: ""
+    muon_suffix: ""
+    name: "QCDscale_{process}"
+    weight: "weight__QCDScale_{scale}"
+    derived_envelope: true
+
+  # PDF replica RMS; alphaS weights are intentionally excluded.
+  PDF_{scale}:
+    jet_suffix: ""
+    muon_suffix: ""
+    name: "pdf_{pdf_process}"
+    weight: "weight__PDF_{scale}"
+    relative_expression: "weight_pdf_{scale}"
+
+  # ========================================
+  # Pileup
+  # ========================================
+
+  PU_{scale}:
+    jet_suffix: ""
+    muon_suffix: ""
+    name: "CMS_pileup_{era}"
+    weight: "weight__PU_{scale}"
+    expression: >
+      genWeight *
+      weight_lumi *
+      weight_xs *
+      weight_pu_{scale} *
+      weight_mu1_LoosePFIso_MediumID_Central *
+      weight_mu1_MediumID_Trk_Central *
+      weight_mu2_LoosePFIso_MediumID_Central *
+      weight_mu2_MediumID_Trk_Central *
+      weight_TrgSF_singleMu_IsoMu24Central
+
+  # ========================================
+  # Muon ID/Iso
+  # ========================================
+
+  MuonID_{scale}:
+    jet_suffix: ""
+    muon_suffix: ""
+    name: "CMS_eff_m_id_{era}"
+    weight: "weight__MuonID_{scale}"
+    expression: >
+      genWeight *
+      weight_lumi *
+      weight_xs *
+      weight_pu *
+      weight_mu1_LoosePFIso_MediumID_Central *
+      weight_mu1_MediumID_Trk_{scale} *
+      weight_mu2_LoosePFIso_MediumID_Central *
+      weight_mu2_MediumID_Trk_{scale} *
+      weight_TrgSF_singleMu_IsoMu24Central
+
+  MuonIso_{scale}:
+    jet_suffix: ""
+    muon_suffix: ""
+    name: "CMS_eff_m_iso_{era}"
+    weight: "weight__MuonIso_{scale}"
+    expression: >
+      genWeight *
+      weight_lumi *
+      weight_xs *
+      weight_pu *
+      weight_mu1_LoosePFIso_MediumID_{scale} *
+      weight_mu1_MediumID_Trk_Central *
+      weight_mu2_LoosePFIso_MediumID_{scale} *
+      weight_mu2_MediumID_Trk_Central *
+      weight_TrgSF_singleMu_IsoMu24Central
+
+  # ========================================
+  # Trigger
+  # ========================================
+
+  singleMuTrigger_{scale}:
+    jet_suffix: ""
+    muon_suffix: ""
+    name: "CMS_eff_m_trigger_{era}"
+    weight: "weight__singleMuTrigger_{scale}"
+    expression: >
+      genWeight *
+      weight_lumi *
+      weight_xs *
+      weight_pu *
+      weight_mu1_LoosePFIso_MediumID_Central *
+      weight_mu1_MediumID_Trk_Central *
+      weight_mu2_LoosePFIso_MediumID_Central *
+      weight_mu2_MediumID_Trk_Central *
+      weight_TrgSF_singleMu_IsoMu24{scale}

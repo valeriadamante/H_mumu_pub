@@ -1,0 +1,97 @@
+
+submit: true
+job_flavour: workday
+
+chunk_size: 1        # files per job
+target_chunk_size_gb: 5.0
+max_files_per_chunk: 5
+max_files: -1        # -1 = all files
+
+
+# ---------------------------------------------------------
+# condor configuration
+# ---------------------------------------------------------
+
+request_cpus: 1
+request_memory: 4GB
+request_disk: 2GB
+
+# ---------------------------------------------------------
+# optional controls
+# ---------------------------------------------------------
+
+# run only subset of datasets (optional override)
+datasets_whitelist: []
+  # - Muon_Run2022C
+#   - Muon_Run2022D
+
+# debug mode
+dryrun: false
+
+
+process_to_select:
+  - Data_Muon
+  - DY
+  - DYto2Mu_MLL105To160
+  - DYto2Mu_MLL105To160_FlashSim
+  - DYto2Mu_minnlo
+  - TT
+  - W
+  - W_NJets
+  - EWK
+  - EWK_2Mu2J_MLL_105to160_herwig
+  - EWK_2Mu2J_MLL_105to160_pythia
+  - EWK_2Mu2J_MLL_105to160_pythia_Flashsim
+  - SingleH
+  - VV_Inclusive
+  - VV
+  - VH_inclusive
+  - VVV
+  - ST
+  - TW
+  - TTX
+  - VBFHto2Mu_M125_amcatnlo
+  - VBFHto2Mu_M125_powheg
+  - VBFHto2Mu_Herwig
+  - GluGluHto2Mu_M125
+  - TTH_inclusive
+
+  # - DY
+  # - DYto2Mu_MLL105To160
+  # - DYto2Mu_MLL105To160_FlashSim
+  # - DYto2Mu_FlashSim
+  # - DYto2L_FlashSim
+  # - DYto2Mu_minnlo
+  # - TT
+  # - TTto2L2Nu_Flashsim
+  # - W
+  # - W_NJets
+  # - EWK
+  # - EWK_2Mu2J_MLL_105to160_herwig
+  # - EWK_2Mu2J_MLL_105to160_pythia
+  # - EWK_2Mu2J_MLL_105to160_pythia_Flashsim
+  # - SingleH
+  # - VV_Inclusive
+  # - VV
+  # - VH_inclusive
+  # - VVV
+  # - ST
+  # - TW
+  # - TTX
+  # - VBFHto2Mu_m125_Flashsim
+  # - VBFHto2Mu_M125_amcatnlo
+  # - VBFHto2Mu_M125_powheg
+  # - VBFHto2Mu_M120
+  # - VBFHto2Mu_M130
+  # - VBFHto2Mu_m125_tuneDown
+  # - VBFHto2Mu_m125_tuneCP5Up
+  # - VBFHto2Mu_Herwig
+  # - GluGluHto2Mu_M125_minnlo
+  # - GluGluHto2Mu_M125
+  # - GluGluHto2Mu_M120
+  # - GluGluHto2Mu_M130
+  # - VHto2Mu
+  # - TTHto2Mu
+  # - TTH_inclusive
+  # - Data_Muon
+

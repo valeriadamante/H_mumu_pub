@@ -1,0 +1,138 @@
+# Selections for the special sync skim of 2026-09-23 (Run2024H, Muon0 + Muon1),
+# produced from NanoAOD by sync/python/special_sync_skim.py.
+#
+# Differences from selections_sync.yaml:
+#   - mu{1,2}_pt is the plain NanoAOD pT (Muon_pt), no bsc, no FSR, no ScaRe.
+#     Only the dimuon system (dimuon_mass = m_mumu) uses the NanoAOD pT with
+#     ScaRe and FSR recovery (Muon_p4_nano_corr_FSR, no bsc).
+#   - good muons: pT>10, |eta|<2.4, mediumId, |dz|<0.1, |dxy|<0.05,
+#     FSR-subtracted isolation < 0.25; exactly 2 loose muons in the event.
+#     Both are applied in the skim, so bothMuons_ML is always true here.
+#   - muon pT thresholds 26 / 20 GeV.
+#   - VBF_def = HasVBF, which already contains the 35/25 GeV jet pT,
+#     m_jj > 400 and |deta_jj| > 2.5 cuts and picks the pT-leading pair.
+#   - Z_sideband is 76-110 GeV.
+
+masses_regions:
+  Z_sideband:
+    expression: "dimuon_mass > 76 && dimuon_mass < 110"
+    store: true
+  Signal_Fit:
+    expression: "dimuon_mass > 115 && dimuon_mass < 135"
+    store: true
+  H_sideband:
+    expression: "(dimuon_mass > 110 && dimuon_mass < 115) || (dimuon_mass > 135 && dimuon_mass < 150)"
+    store: true
+  Signal_ext:
+    expression: "dimuon_mass > 110 && dimuon_mass < 150"
+    store: true
+  mass_inclusive:
+    expression: "dimuon_mass > 60 && dimuon_mass < 150"
+    store: true
+  Z_CR_H_SB:
+    expression: "(dimuon_mass > 76 && dimuon_mass < 115) || (dimuon_mass > 130 && dimuon_mass < 150)"
+    store: true
+
+muons_selection:
+  muon_pre_sel_check:
+    expression: "mu1_pt > 10 && abs(mu1_eta) < 2.4 && mu2_pt > 10 && abs(mu2_eta) < 2.4"
+    store: false
+  muons_OS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} < 0"
+    store: true
+  muons_SS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} > 0"
+    store: false
+  muons_trigger:
+    expression: "Event_HasTriggerMatching_singleMu{mu_suff} && HLT_IsoMu24 && (mu1_HasTriggerMatching_singleMu{mu_suff} || mu2_HasTriggerMatching_singleMu{mu_suff})"
+    store: true
+  muons_OS_presel_trg:
+    expression: "muon_pre_sel_check{mu_suff} && muons_OS{mu_suff} && muons_trigger{mu_suff}"
+    store: false
+  mu1_pt_g26:
+    expression: "mu1_pt{mu_suff} > 26"
+    store: false
+  mu2_pt_g20:
+    expression: "mu2_pt{mu_suff} > 20"
+    store: false
+  mu_pt_sel:
+    expression: "mu1_pt_g26{mu_suff} && mu2_pt_g20{mu_suff}"
+    store: false
+  mu1_ML:
+    expression: "mu1_mediumId{mu_suff} && mu1_newIso{mu_suff} < 0.25 && abs(mu1_dz{mu_suff}) < 0.1 && abs(mu1_dxy{mu_suff}) < 0.05"
+    store: false
+  mu2_ML:
+    expression: "mu2_mediumId{mu_suff} && mu2_newIso{mu_suff} < 0.25 && abs(mu2_dz{mu_suff}) < 0.1 && abs(mu2_dxy{mu_suff}) < 0.05"
+    store: false
+  bothMuons_ML:
+    expression: "mu1_ML{mu_suff} && mu2_ML{mu_suff}"
+    store: false
+  exactly_2_loose_muons:
+    expression: "n_looseMuons == 2"
+    store: false
+
+jets_selection:
+  has_good_jets:
+    expression: "N_SelectedJets{jet_suff} >= 0"
+    store: true
+  jets_btag_clean_sel:
+    expression: "SelectedJetTagSel{jet_suff}"
+    store: true
+
+categories:
+  base_sel_muons:
+    expression: "muons_OS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && bothMuons_ML{mu_suff} && exactly_2_loose_muons"
+    store: true
+  baseline:
+    expression: "base_sel_muons{tot_suff} && SelectedJetTagSel{jet_suff}"
+    store: true
+  VBF_def:
+    expression: "HasVBF{jet_suff}"
+    store: true
+  VBF:
+    expression: "baseline{tot_suff} && VBF_def{tot_suff}"
+    store: true
+  ggF:
+    expression: "baseline{tot_suff} && !VBF_def{tot_suff}"
+    store: true
+  ggF_0J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 0"
+    store: true
+  ggF_1J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 1"
+    store: true
+  ggF_2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 2"
+    store: true
+  ggF_ge2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+  VBF_ge2J:
+    expression: "VBF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+
+# Cumulative steps appended after the skim report counts.
+cutflow:
+  - base_sel_muons
+  - baseline
+  - mass_inclusive
+
+cutflow_vbf_Z_CR_H_SB:
+  - muon_pre_sel_check
+  - muons_OS
+  - muons_trigger
+  - mu1_pt_g26
+  - mu2_pt_g20
+  - bothMuons_ML
+  - exactly_2_loose_muons
+  - base_sel_muons
+  - jets_btag_clean_sel
+  - baseline
+  - jets_ge2
+  - vbf_jets_ge2
+  - vbf_pair_pt
+  - vbf_pair_mjj
+  - vbf_pair_deta
+  - VBF_def
+  - VBF
+  - Z_CR_H_SB

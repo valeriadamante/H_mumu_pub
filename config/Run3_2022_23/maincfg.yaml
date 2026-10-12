@@ -1,0 +1,95 @@
+era: Run3_2022_23
+luminosity: 62305.390  # pb-1, https://twiki.cern.ch/twiki/bin/view/CMS/PdmVRun3Analysis#DATA_AN2 command brilcalc lumi -b "STABLE BEAMS" --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -u /pb -i Cert_Collisions2024_378981_386951_Golden.json
+
+lumiFile: corrections/data/golden_json/Cert_Collisions2024_378981_386951_Golden.json
+
+crossSectionsFile: config/crossSections13p6TeV.yaml
+nano_version: v15
+
+ignore_missing_nanoAOD_files:
+  data: False
+  signals: True
+  backgrounds: True
+
+
+MET_flags:  # https://twiki.cern.ch/twiki/bin/view/CMS/MissingETOptionalFiltersRun2#Run_3_2024_data_and_MC_Recommend
+  - Flag_goodVertices
+  - Flag_globalSuperTightHalo2016Filter
+  - Flag_EcalDeadCellTriggerPrimitiveFilter
+  - Flag_BadPFMuonFilter
+  - Flag_BadPFMuonDzFilter
+  - Flag_hfNoisyHitsFilter
+  - Flag_eeBadScFilter
+  - Flag_ecalBadCalibFilter
+
+want_variations: True
+bTagAlgo: UParTAK4
+
+mu_weights_to_store: ["weight_mu1_IsoMu24_CutBasedIdMedium_and_PFIsoMedium_Central","weight_mu1_IsoMu24_CutBasedIdMedium_and_PFIsoMedium_Down","weight_mu1_IsoMu24_CutBasedIdMedium_and_PFIsoMedium_Up","weight_mu1_IsoMu24_CutBasedIdTight_and_PFIsoTight_Central","weight_mu1_IsoMu24_CutBasedIdTight_and_PFIsoTight_Down","weight_mu1_IsoMu24_CutBasedIdTight_and_PFIsoTight_Up","weight_mu1_LoosePFIso_MediumID_Central","weight_mu1_LoosePFIso_MediumID_Down","weight_mu1_LoosePFIso_MediumID_Up","weight_mu1_MediumID_Trk_Central","weight_mu1_MediumID_Trk_Down","weight_mu1_MediumID_Trk_Up","weight_mu1_TightID_Trk_Central","weight_mu1_TightID_Trk_Down","weight_mu1_TightID_Trk_Up","weight_mu1_TightPFIso_TightID_Central","weight_mu1_TightPFIso_TightID_Down","weight_mu1_TightPFIso_TightID_Up","weight_mu2_IsoMu24_CutBasedIdMedium_and_PFIsoMedium_Central","weight_mu2_IsoMu24_CutBasedIdMedium_and_PFIsoMedium_Down","weight_mu2_IsoMu24_CutBasedIdMedium_and_PFIsoMedium_Up","weight_mu2_IsoMu24_CutBasedIdTight_and_PFIsoTight_Central","weight_mu2_IsoMu24_CutBasedIdTight_and_PFIsoTight_Down","weight_mu2_IsoMu24_CutBasedIdTight_and_PFIsoTight_Up","weight_mu2_LoosePFIso_MediumID_Central","weight_mu2_LoosePFIso_MediumID_Down","weight_mu2_LoosePFIso_MediumID_Up","weight_mu2_MediumID_Trk_Central","weight_mu2_MediumID_Trk_Down","weight_mu2_MediumID_Trk_Up","weight_mu2_TightID_Trk_Central","weight_mu2_TightID_Trk_Down","weight_mu2_TightID_Trk_Up","weight_mu2_TightPFIso_TightID_Central","weight_mu2_TightPFIso_TightID_Down","weight_mu2_TightPFIso_TightID_Up"]
+
+variables:
+  # - DNN_NNOutput
+  ## muMu system #
+#  - DNN_NNOutput
+  # - VBFNet_NNOutput
+  # - PostVBFNetDNN_NNOutput
+  - m_mumu
+  - m_mumu_noCorr
+  - pt_mumu
+  - eta_mumu
+  - dR_mumu
+  - mu1_pt
+  - mu2_pt
+  - mu1_eta
+  - mu2_eta
+  - phi_CS
+  - cosTheta_CS
+
+  # ## Jets vars #
+  - N_SelectedJets
+  - leadingjet_pt
+  - leadingjet_eta
+  - leadingjet_phi
+  # - leadingjet_rapidity
+  # - SelectedJets_HT
+  - subleadingjet_pt
+  - subleadingjet_eta
+  - subleadingjet_phi
+  - delta_eta_jj_ls
+  - m_jj_ls
+  # - subleadingjet_rapidity
+  # - thirdjet_pt
+  # - thirdjet_eta
+  # - thirdjet_phi
+  # - thirdjet_rapidity
+  # - fourthjet_pt
+  # - fourthjet_eta
+  # - fourthjet_phi
+  # - fourthjet_rapidity
+
+
+  # ## VBF Jets
+  - m_jj
+  - delta_eta_jj
+  - vbfjet1_pt
+  - vbfjet2_pt
+  - vbfjet1_eta
+  - vbfjet2_eta
+  - vbfjet1_phi
+  - vbfjet2_phi
+
+  ## VBF jets + MUON
+  - Zeppenfeld_Var
+  - R_pt
+  - pt_centrality
+  # - minDeltaPhi
+  # - minDeltaEta
+
+  ## soft jet activity
+  - SoftActivityJetHT
+  - nSoftActivityJet
+  - SoftJetCleanedActivity_N
+  - SoftJetCleanedActivity_N
+  - SoftJetCleanedActivity_ptSum
+  - SoftJetActivity_NoOverlapWithMuonsAndEtaCleaning_N
+  - SoftJetActivity_NoOverlapWithMuonsAndEtaCleaning_ptSum

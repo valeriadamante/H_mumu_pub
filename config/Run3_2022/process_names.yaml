@@ -1,0 +1,844 @@
+############## DY ##############
+DY:
+  name: "DY"
+  color: dodgerblue
+  split_jet_components: true
+  jet_component_styles: &dy_jet_component_styles
+    0J: aqua
+    1J Hard: skyblue
+    1J PU: deepskyblue
+    2J Hard: cornflowerblue
+    2J PU1: royalblue
+    2J PU2: navy
+    VBF Hard: lightsteelblue
+    VBF PU1: steelblue
+    VBF PU2: midnightblue
+  datasets:
+    - DYto2L_M_50_amcatnloFXFX
+    # - DYto2L_M_50_0J_amcatnloFXFX
+    # - DYto2L_M_50_1J_amcatnloFXFX
+    # - DYto2L_M_50_2J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_40to100_1J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_100to200_1J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_200to400_1J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_400to600_1J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_600_1J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_40to100_2J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_100to200_2J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_200to400_2J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_400to600_2J_amcatnloFXFX
+    # - DYto2L_M_50_PTLL_600_2J_amcatnloFXFX
+
+DYto2Mu_MLL105To160:
+  name: "DY MLL 105-160"
+  color: dodgerblue
+  split_jet_components: true
+  jet_component_styles: *dy_jet_component_styles
+  datasets:
+    - DYto2Mu_MLL_105to160_amcatnloFXFX
+
+DYto2Mu_MLL105To160_FlashSim:
+  name: "DY"
+  color: dodgerblue
+  split_jet_components: true
+  jet_component_styles: *dy_jet_component_styles
+  datasets: [ ]
+
+############## TT ##############
+TT:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "t $\\bar{t}$"
+  color: green  # turquoise
+  datasets:
+    - TTto2L2Nu
+    - TTtoLNu2Q
+    - TTto4Q
+
+TTto2L2Nu:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  datasets:
+    - TTto2L2Nu
+
+TTtoLNu2Q:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  datasets:
+    - TTtoLNu2Q
+
+TTto4Q:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  datasets:
+    - TTto4Q
+
+TT_Inclusive:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "t#bar{t} Inclusive"
+  color: darkgreen  # turquoise
+  datasets:
+    - TT
+
+
+############## WJetsToLNu ##############
+W:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "W"
+  color: navy
+  datasets:
+    - WtoLNu_amcatnloFXFX
+
+W_NJets:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "W $\\rightarrow \\ell \\nu$+ jets"
+  color: navy
+  datasets:
+    - WtoLNu_0J_amcatnloFXFX
+    - WtoLNu_1J_amcatnloFXFX
+    - WtoLNu_2J_amcatnloFXFX
+
+############## EWK ##############
+EWK_LLJJ:
+  split_jet_components: true
+  jet_component_styles:
+    0J: hotpink
+    1J Hard: plum
+    1J PU: orchid
+    2J Hard: mediumorchid
+    2J PU1: darkorchid
+    2J PU2: purple
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "EWK"
+  color: lavender
+  datasets: [ ]
+
+EWK:
+  jet_component_styles:
+    0J: hotpink
+    1J Hard: plum
+    1J PU: orchid
+    2J Hard: mediumorchid
+    2J PU1: darkorchid
+    2J PU2: purple
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "EWK"
+  color: lavender
+  split_jet_components: true
+  datasets:
+    - EWK_2L2J_madgraph_herwig
+
+EWK_2Mu2J_MLL_105to160_herwig:
+  jet_component_styles:
+    0J: hotpink
+    1J Hard: plum
+    1J PU: orchid
+    2J Hard: mediumorchid
+    2J PU1: darkorchid
+    2J PU2: purple
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "EWK - MLL105-160 - H"
+  # is_signal: true
+  # color: magenta
+  color: lavender
+  split_jet_components: true
+  datasets:
+    - EWK_2Mu2J_MLL_105to160_herwig
+
+EWK_2Mu2J_MLL_105to160_pythia:
+  jet_component_styles:
+    0J: hotpink
+    1J Hard: plum
+    1J PU: orchid
+    2J Hard: mediumorchid
+    2J PU1: darkorchid
+    2J PU2: purple
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "EWK - MLL105-160 - P"
+  # is_signal: true
+  # color: cyan
+  color: lavender
+  split_jet_components: true
+  datasets:
+    - EWK_2Mu2J_MLL_105to160_pythia
+
+EWK_2Mu2J_MLL_105to160_pythia_Flashsim:
+  jet_component_styles:
+    0J: hotpink
+    1J Hard: plum
+    1J PU: orchid
+    2J Hard: mediumorchid
+    2J PU1: darkorchid
+    2J PU2: purple
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "EWK - MLL105-160 - F"
+  color: lavender
+  split_jet_components: true
+  datasets: [ ]
+############## Other single H  ##############
+SingleH:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "Single H"
+  color: aqua
+  datasets:
+    - GluGluHto2Tau_UncorrelatedDecay_UnFiltered
+    - GluGluHto2B_M125
+    - VBFHto2B_M125
+    - VBFHto2Tau_UncorrelatedDecay_UnFiltered
+    - VBFHto2Wto2L2Nu_M125
+    - GluGluHto2Wto2L2Nu_M125
+
+############## VV ##############
+VV_Inclusive:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "VV Inclusive"
+  color: tomato
+  datasets:
+    - WW
+    - WZ
+    - ZZ
+
+VV:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "VV"
+  color: tomato
+  datasets:
+    - WWto2L2Nu_powheg
+    - WWto4Q_powheg
+    - WWtoLNu2Q_powheg
+    - WZto3LNu_powheg
+    - WZto2L2Q_powheg
+    - WZtoLNu2Q_powheg
+    - ZZto2L2Nu_powheg
+    - ZZto2L2Q_powheg
+    - ZZto2Nu2Q_powheg
+    - ZZto4L_powheg
+
+############## VH non-inclusive ##############
+VH_inclusive:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "VH"
+  color: slateblue
+  datasets:
+    - ZH_Hto2B_Zto2L
+    - ZH_Hto2B_Zto2Q
+    - ggZH_Hto2B_Zto2L
+    - ggZH_Hto2B_Zto2Q
+    - WminusH_Hto2B_Wto2Q
+    - WminusH_Hto2B_WtoLNu
+    - WplusH_Hto2B_Wto2Q
+    - WplusH_Hto2B_WtoLNu
+
+############## VVV inclusive ##############
+VVV:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "VVV"
+  color: plum
+  datasets:
+    - WWW_4F
+    - WWZ_4F
+    - WZZ
+    - ZZZ
+
+############## ST ##############
+ST:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "ST"
+  color: cyan
+  datasets:
+    - TbarBtoLminusNuB_s_channel_4FS
+    - TBbartoLplusNuBbar_s_channel_4FS
+    - TbarBQ_t_channel_4FS
+    - TBbarQ_t_channel_4FS
+
+
+############## TW ##############
+TW:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "TW"
+  color: green
+  datasets:
+    - TWminusto2L2Nu
+    - TWminusto4Q
+    - TWminustoLNu2Q
+    - TbarWplusto2L2Nu
+    - TbarWplusto4Q
+    - TbarWplustoLNu2Q
+
+############## TTX ##############
+TTX:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "TT+X"
+  color: pink
+  datasets:
+    - TTWH
+    - TTWW
+    - TTZH
+    - TTZZ
+    - TTZ_Zto2Q
+
+
+############## VBF signal ##############
+VBFHto2Mu_M125_amcatnlo:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "VBFHto2Mu amcatnlo"
+  is_signal: true
+  color: darkgreen
+  datasets:
+    - VBFHto2Mu_m125_amcatnlo
+
+VBFHto2Mu_M125_powheg:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "VBFHto2Mu powheg"
+  is_signal: true
+  color: fuchsia
+  datasets:
+    - VBFHto2Mu_M125_powheg
+
+VBFHto2Mu_m120:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "VBFHto2Mu M120"
+  is_signal: true
+  color: fuchsia
+  datasets:
+    - VBFHto2Mu_M120_amcatnlo
+
+VBFHto2Mu_m130:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "VBFHto2Mu M130"
+  is_signal: true
+  color: fuchsia
+  datasets:
+    - VBFHto2Mu_M130_amcatnlo
+
+VBFHto2Mu_m125_tuneDown:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "VBFHto2Mu tuneDown"
+  is_signal: true
+  color: fuchsia
+  datasets:
+    - VBFHto2Mu_m125_tuneCP5Down_amcatnlo
+
+VBFHto2Mu_m125_tuneUp:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "VBFHto2Mu tuneUp"
+  is_signal: true
+  color: fuchsia
+  datasets:
+    - VBFHto2Mu_m125_tuneCP5Up_amcatnlo
+
+VBFHto2Mu_Herwig:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "VBFHto2Mu H"
+  is_signal: true
+  color: fuchsia
+  datasets: [ ]
+
+############## ggH signal ##############
+GluGluHto2Mu_tuneDown:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "GluGluHto2Mu_tuneDown"
+  is_signal: true
+  color: cyan
+  datasets:
+    - GluGluHto2Mu_tuneDown
+GluGluHto2Mu_tuneUp:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "GluGluHto2Mu_tuneUp"
+  is_signal: true
+  color: cyan
+  datasets:
+    - GluGluHto2Mu_tuneUp
+GluGluHto2Mu_amcatnlo:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "GluGluHto2Mu_amcatnlo"
+  is_signal: true
+  color: cyan
+  datasets:
+    - GluGluHto2Mu_amcatnlo
+
+GluGluHto2Mu_MiNNLO:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "GluGluHto2Mu_minnlo"
+  is_signal: true
+  color: cyan
+  datasets:
+    - GluGluHto2Mu_MiNNLO
+
+GluGluHto2Mu:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "GluGluHto2Mu"
+  is_signal: true
+  color: cyan
+  datasets:
+    - GluGluHto2Mu
+
+
+GluGluHto2Mu_M130:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "GluGluHto2Mu_M130"
+  is_signal: true
+  color: cyan
+  datasets:
+    - GluGluHto2Mu_M130
+
+GluGluHto2Mu_M120:
+  split_jet_components: true
+  jet_component_styles:
+    0J: "#ffd0f1"
+    1J Hard: "#f69bde"
+    1J PU: "#e95bc8"
+    2J Hard: "#d52bad"
+    2J PU1: "#a90c86"
+    2J PU2: "#73005f"
+    VBF Hard: thistle
+    VBF PU1: mediumpurple
+    VBF PU2: indigo
+  name: "GluGluHto2Mu_M120"
+  is_signal: true
+  color: cyan
+  datasets:
+    - GluGluHto2Mu_M120
+############## VH signal ##############
+
+VHto2Mu:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "VHto2Mu"
+  # is_signal: true
+  color: red
+  datasets:
+    - WminusH_Hto2Mu
+    - WplusH_Hto2Mu
+    - ZH_Hto2Mu
+
+############## TTH signal ##############
+
+TTHto2Mu:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "TTHto2Mu"
+  # is_signal: true
+  color: red
+  datasets:
+    - TTH_Hto2Mu
+
+TTH_inclusive:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "ttH"
+  color: red
+  datasets:
+    - TTHtoNon2B_M125
+    - TTHto2B_M125
+
+############### Data ##############
+
+
+Data_Full:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "Data"
+  is_data: true
+  datasets:
+    - EGamma_Run2022C
+    - EGamma_Run2022D
+    - Muon_Run2022C
+    - Muon_Run2022D
+    - SingleMuon_Run2022C
+    - DoubleMuon_Run2022C
+    - MuonEG_Run2022C
+    - MuonEG_Run2022D
+
+Data_EGamma:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "Data EGamma"
+
+  is_data: true
+  datasets:
+    - EGamma_Run2022C
+    - EGamma_Run2022D
+
+Data_Muon:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "Data"
+  is_data: true
+  datasets:
+    - SingleMuon_Run2022C
+    - Muon_Run2022C
+    - Muon_Run2022D
+
+Data_MuonEG:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "Data MuonEG"
+  is_data: true
+  datasets:
+    - MuonEG_Run2022C
+
+Other:
+  split_jet_components: false
+  jet_component_styles:
+    0J: papayawhip
+    1J Hard: moccasin
+    1J PU: sandybrown
+    2J Hard: darkorange
+    2J PU1: orangered
+    2J PU2: firebrick
+    VBF Hard: wheat
+    VBF PU1: chocolate
+    VBF PU2: darkred
+  name: "Other"
+  color: slateblue
+  datasets: [ ]

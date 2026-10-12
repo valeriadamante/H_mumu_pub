@@ -1,0 +1,30 @@
+# Where the analysis reads and writes its data.  The only place with
+# user-specific storage paths: code and campaign configs refer to these keys.
+#
+# Override for another user or site, in this order of precedence:
+#   HMUMU_<KEY>=...                  one key, e.g. HMUMU_SKIM=/eos/.../my_skim
+#   HMUMU_PATHS=/path/to/mine.yaml   a file with only the keys you change
+#
+# {name} expands to another key; {repo} is the repository checkout.
+# `source env.sh` exports every key as HMUMU_<KEY> for the shell scripts;
+# `python3 common/paths.py` prints them.
+
+eos_user: /path/to/your/output
+
+# Skims (stage 1).  The no-horn-veto variant sits next to the nominal one.
+skim: "{eos_user}/skims"
+skim_no_horn_veto: "{skim}_noJetHornVeto"
+
+# Validation manifests (stage 2), one JSON per era/dataset.
+manifests: "{eos_user}/manifests_skim_v4"
+
+# Histograms: the DY-weight derivation inputs and every campaign after it.
+dy_weight_histograms: "{eos_user}/skim_v4/DY_weights"
+histograms: "{eos_user}/skim_v4/post_dy"
+
+# Sync exchange area and the web area where plots are published.
+sync: "{eos_user}/Sync"
+www: "{eos_user}/www"
+
+# Grid proxy used by the Condor jobs (voms-proxy-init --out <this>).
+proxy: "{repo}/data/voms.proxy"
