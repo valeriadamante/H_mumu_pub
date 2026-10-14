@@ -61,7 +61,7 @@ def xrootd(path):
 
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--variant", choices=("special_20260923", "filippo_20260925", "ggfvbf_20261015"),
+    parser.add_argument("--variant", choices=("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013"),
                         default="special_20260923", help="selection of special_sync_skim.py")
     parser.add_argument("--tag", default=None, help="output folder name (default: the variant)")
     parser.add_argument("--output-root", type=Path, default=path("sync"))
@@ -93,14 +93,14 @@ def main():
     if unknown:
         raise SystemExit(f"not in samples_withfiles.yaml: {unknown}")
     extra = "--mc-lumi-split" if args.mc_lumi_split else "none"
-    default_datasets = GGFVBF_DATASETS if args.variant == "ggfvbf_20261015" else DATASETS
+    default_datasets = GGFVBF_DATASETS if args.variant.startswith("ggfvbf") else DATASETS
     for dataset in args.dataset or default_datasets:
         output_dir = (args.output_root / f"{args.group_name}-{dataset}"
-                      if args.variant == "ggfvbf_20261015"
+                      if args.variant.startswith("ggfvbf")
                       else args.output_root / args.tag / dataset)
         output_dir.mkdir(parents=True, exist_ok=True)
-        files = requested_files(samples[dataset], exact_primary=args.variant == "ggfvbf_20261015")
-        inputs_manifest = (output_dir / "inputs.txt" if args.variant == "ggfvbf_20261015"
+        files = requested_files(samples[dataset], exact_primary=args.variant.startswith("ggfvbf"))
+        inputs_manifest = (output_dir / "inputs.txt" if args.variant.startswith("ggfvbf")
                            else output_dir.parent / f"{dataset}_inputs.txt")
         inputs_manifest.write_text(
             "".join(f"job_{i}\t{path}\n" for i, path in enumerate(files)))

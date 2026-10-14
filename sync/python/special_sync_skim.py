@@ -52,12 +52,14 @@ import yaml  # noqa: E402
 import common.utilities as utilities  # noqa: E402
 
 ERA = "Run3_2024"
-VARIANTS = ("special_20260923", "filippo_20260925", "ggfvbf_20261015")
+VARIANTS = ("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013")
 
 
 def selection_config_path(variant):
     if variant == "ggfvbf_20261015":
         return REPOSITORY / "config" / ERA / "selections_sync.yaml"
+    if variant == "ggfvbf_pisa_20261013":
+        return REPOSITORY / "config" / ERA / "selections_sync_ggfvbf_pisa_20261013.yaml"
     stem = "selections_sync_special_20260923" if variant == "special_20260923" else f"selections_sync_{variant}"
     return REPOSITORY / "config" / ERA / f"{stem}.yaml"
 
@@ -191,7 +193,7 @@ def load(path):
         return yaml.safe_load(stream)
 
 
-def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw_pt_min=20.0):
+def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw_pt_min=20.0, pisa=False):
     """Good/loose muons with NanoAOD pT, trigger matching and dimuon system."""
     new_cols = []
 
@@ -247,7 +249,16 @@ def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw
     index_mask = f"Muon_pt > {raw_pt_min}" if inclusive else "good_muons"
     df = df.Define("sync_preselection_muons", index_mask)
     df = df.Define("good_idx", "ROOT::VecOps::Nonzero(sync_preselection_muons)")
-    df = df.Define("sorted_idx", "Reverse(Take(good_idx, Argsort(Take(Muon_pt, good_idx))))")
+    df = df.Define("sorted_idx_raw", "Reverse(Take(good_idx, Argsort(Take(Muon_pt, good_idx))))")
+    if pisa:
+        # Pisa candidate: exactly two good and exactly two loose muons.  Their pair
+        # replaces the raw-pT pairing, whatever its pT (good muons start at 10 GeV).
+        df = track(df, "pisa_candidate", "n_goodMuons == 2 && n_looseMuons == 2")
+        df = df.Define("pisa_idx", "ROOT::VecOps::Nonzero(good_muons)")
+        df = df.Define("sorted_idx_pisa", "Reverse(Take(pisa_idx, Argsort(Take(Muon_pt, pisa_idx))))")
+        df = df.Define("sorted_idx", "pisa_candidate ? sorted_idx_pisa : sorted_idx_raw")
+    else:
+        df = df.Define("sorted_idx", "sorted_idx_raw")
     df = track(df, "mu1_idx", "sorted_idx.size() > 0 ? int(sorted_idx[0]) : -1")
     df = track(df, "mu2_idx", "sorted_idx.size() > 1 ? int(sorted_idx[1]) : -1")
     df = df.Filter("sorted_idx.size() >= 2" if inclusive else "sorted_idx.size() == 2",
@@ -310,8 +321,13 @@ def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw
     df = track(df, "m_mumu_FSR_corr", "(mu1_p4_FSR_corr + mu2_p4_FSR_corr).M()")
     df = track(df, "pt_mumu_nano", "(mu1_p4 + mu2_p4).Pt()")
     if inclusive:
-        df = df.Define("sync_preselection", "m_mumu_nano > 50 && m_mumu_nano < 200")
-        df = df.Filter("sync_preselection", "50 < raw dimuon mass < 200 GeV")
+        if pisa:
+            # Raw OR corrected mass, so that Pisa's corrected-mass window is a subset.
+            df = df.Define("sync_preselection", "(m_mumu_nano > 50 && m_mumu_nano < 200) || "
+                           "(m_mumu_FSR_corr > 50 && m_mumu_FSR_corr < 200)")
+        else:
+            df = df.Define("sync_preselection", "m_mumu_nano > 50 && m_mumu_nano < 200")
+        df = df.Filter("sync_preselection", "50 < dimuon mass < 200 GeV")
     else:
         df = df.Filter("m_mumu > 50 && m_mumu < 200", "dimuon mass cut")
     return df, new_cols
@@ -346,14 +362,15 @@ def main():
         raise SystemExit(f"{args.dataset_name} is not in {config_dir / 'samples.yaml'}")
     dataset_cfg = samples[args.dataset_name]
     is_data = bool(dataset_cfg.get("is_data", False))
-    inclusive = args.variant == "ggfvbf_20261015"
+    inclusive = args.variant.startswith("ggfvbf")
+    pisa = args.variant == "ggfvbf_pisa_20261013"
     raw_pt_min = 10.0 if args.dataset_name in {
         "TTH_Hto2Mu", "ZH_Hto2Mu", "WplusH_Hto2Mu",
     } else 20.0
     sel_config = utilities.get_config(str(config_dir / "selections.yaml"))
     from common.jet_horn_policy import configure_horn_veto, horn_mitigation_enabled
     configure_horn_veto(sel_config, ERA, "configured")
-    filippo = args.variant == "filippo_20260925"
+    filippo = args.variant in ("filippo_20260925", "ggfvbf_pisa_20261013")
     if filippo:
         # Filippo's horn: 2.5 < |eta| < 3.0, |eta| = 2.5 excluded.
         sel_config["jet_horn_veto_expr"] = ("(abs(v_ops::eta(Jet_p4)) > 2.5 && abs(v_ops::eta(Jet_p4)) < 3.0 "
@@ -416,14 +433,26 @@ def main():
     if "MET_flags" in config and not inclusive:
         from analysis.other import applyMETFlags
         df = applyMETFlags(df, config, is_data)
+    if pisa:
+        # Pisa applies the MET filters as a skim filter: keep the decision as a flag.
+        from analysis.other import applyBadMETfilter
+        if config.get("badMET_flag_runs"):
+            df = applyBadMETfilter(df, config["badMET_flag_runs"], is_data)
+        df = df.Define("pass_met_filters", " && ".join(config.get("MET_flags", [])) or "true")
+        if not is_data:
+            df = df.Define("pass_golden_json", "true")
 
     from analysis.muons import DefineMuonPtAndP4
     df = DefineMuonPtAndP4(df, False)
     muon_columns = utilities.GetObservablesCols("Muon", is_data, nano_version)
-    df, cols = define_muons(df, muon_columns, trigger_config, filippo, inclusive, raw_pt_min)
+    df, cols = define_muons(df, muon_columns, trigger_config, filippo, inclusive, raw_pt_min, pisa)
     if not is_data and inclusive:
         from corrections.mu import apply_muIDIso_weights
         from common.trigger_weights import AddTriggerWeightsAndErrors
+        if pisa:
+            # As Pisa (and sync_mc_weights.py): scale factors at the bsc+ScaRe+FSR pT and eta.
+            for i in (1, 2):
+                df = df.Redefine(f"mu{i}_pt", f"mu{i}_pt_FSR_corr").Redefine(f"mu{i}_eta", f"mu{i}_eta_FSR_corr")
         df, mu_weights = apply_muIDIso_weights(df, config, False)
         df = AddTriggerWeightsAndErrors(df, WantErrors=False)
         cols += mu_weights + ["weight_TrgSF_singleMu_IsoMu24Central"]
@@ -438,9 +467,12 @@ def main():
             "((mu2_pt < 30) ? weight_mu2_TightID_Trk_Central : weight_mu2_MediumID_Trk_Central)",
         )
         cols += ["weight_generator", "weight_pileup", "weight_trigger", "weight_muon_idiso"]
+        if pisa:
+            for i in (1, 2):
+                df = df.Redefine(f"mu{i}_pt", f"Muon_pt[mu{i}_idx]").Redefine(f"mu{i}_eta", f"Muon_eta[mu{i}_idx]")
     df = df.Define("GoodMuon_p4", "Muon_p4_nano[good_muons]")
     df, electron_cols = define_electrons(df, not filippo and not inclusive)
-    if inclusive:
+    if inclusive and not pisa:  # the Pisa selection yaml defines electron_veto itself
         df = df.Define("electron_veto", "n_goodElectrons == 0")
         electron_cols.append("electron_veto")
     cols += electron_cols
@@ -473,7 +505,10 @@ def main():
         if "FatJet_pt" in available and "FatJet_rawFactor" in available:
             df = df.Define("FatJet_pt_beforeJERC", "FatJet_pt * (1.f - FatJet_rawFactor)")
             fatjet_cols.append("FatJet_pt_beforeJERC")
-        df = df.Define("nFatJet", "static_cast<int>(FatJet_pt.size())")
+        # NanoAOD normally stores the collection counter already.  A few input
+        # variants do not, so only synthesize it when it is actually missing.
+        if "nFatJet" not in available:
+            df = df.Define("nFatJet", "static_cast<int>(FatJet_pt.size())")
         cols += fatjet_cols + ["nFatJet"]
     pair = "TwoLeadingVBFPair" if filippo else "LeadingVBFPair"
     df = df.Define("VBFPairIdx", f"special_sync::{pair}(SelectedJet_pt, SelectedJet_eta, "
@@ -509,8 +544,8 @@ def main():
     report = df.Report()
     keep = sync_tuple.selected_columns(df, False, extended=inclusive)
     extra = cols + mc_cols + ["sample", "sample_id", "MET_pt", "MET_phi", "MET_collection",
-                    "pass_golden_json", "sync_preselection",
-                    "n_goodMuons", "n_looseMuons",
+                    "pass_golden_json", "pass_met_filters", "sync_preselection",
+                    "n_goodMuons", "n_looseMuons", "pisa_candidate",
                     "SelectedJetTagSel", "JetTagSel", "exactly_2_loose_muons", "bothMuons_ML",
                     "electron_veto", "m_mumu_nano",
                     "pt_mumu_nano", "m_mumu_nano_corr", "m_mumu_FSR_corr"]
