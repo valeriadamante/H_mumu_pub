@@ -61,7 +61,7 @@ def xrootd(path):
 
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--variant", choices=("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013"),
+    parser.add_argument("--variant", choices=("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013", "ggfvbf_iso_20261014", "ggfvbf_analysis_20261014"),
                         default="special_20260923", help="selection of special_sync_skim.py")
     parser.add_argument("--tag", default=None, help="output folder name (default: the variant)")
     parser.add_argument("--output-root", type=Path, default=path("sync"))
@@ -117,7 +117,8 @@ def main():
     queue = log_dir / ("jobs_" + "_".join(args.dataset) + ".txt" if args.dataset else "jobs.txt")
     queue.write_text("\n".join(lines) + "\n")
     submit = queue.with_suffix(".sub")
-    submit.write_text(f"""executable = {REPOSITORY}/sync/python/run_special_sync_skim.sh
+    wrapper = "run_special_sync_skim_analysis.sh" if args.variant == "ggfvbf_analysis_20261014" else "run_special_sync_skim.sh"
+    submit.write_text(f"""executable = {REPOSITORY}/sync/python/{wrapper}
 arguments = $(proxy) $(repo) $(dataset) $(nanofile) $(outdir) $(job) $(variant) $(extra)
 output = {log_dir}/$(dataset)_$(job).$(ClusterId).$(ProcId).out
 error = {log_dir}/$(dataset)_$(job).$(ClusterId).$(ProcId).err

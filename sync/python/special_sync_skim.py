@@ -52,7 +52,7 @@ import yaml  # noqa: E402
 import common.utilities as utilities  # noqa: E402
 
 ERA = "Run3_2024"
-VARIANTS = ("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013")
+VARIANTS = ("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013", "ggfvbf_iso_20261014")
 
 
 def selection_config_path(variant):
@@ -60,6 +60,8 @@ def selection_config_path(variant):
         return REPOSITORY / "config" / ERA / "selections_sync.yaml"
     if variant == "ggfvbf_pisa_20261013":
         return REPOSITORY / "config" / ERA / "selections_sync_ggfvbf_pisa_20261013.yaml"
+    if variant == "ggfvbf_iso_20261014":
+        return REPOSITORY / "config" / ERA / "selections_sync_ggfvbf_iso_20261014.yaml"
     stem = "selections_sync_special_20260923" if variant == "special_20260923" else f"selections_sync_{variant}"
     return REPOSITORY / "config" / ERA / f"{stem}.yaml"
 
@@ -193,7 +195,7 @@ def load(path):
         return yaml.safe_load(stream)
 
 
-def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw_pt_min=20.0, pisa=False):
+def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw_pt_min=20.0, pisa=False, std_iso=False):
     """Good/loose muons with NanoAOD pT, trigger matching and dimuon system."""
     new_cols = []
 
@@ -213,7 +215,9 @@ def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw
                    "Muon_fsrPhotonIdx, FsrPhoton_eta, FsrPhoton_phi)")
     df = df.Define("Muon_newIso", "(Muon_pfRelIso04_all * Muon_pt - Muon_fsrPhotonPtIso) / Muon_pt")
 
-    kinematic = "Muon_pt > 10 && abs(Muon_eta) < 2.4 && Muon_newIso < 0.25"
+    # std_iso: the isolation of the main analysis (pfIsoId >= 2, no FSR subtraction) instead of newIso
+    isolation = "Muon_pfIsoId >= 2" if std_iso else "Muon_newIso < 0.25"
+    kinematic = f"Muon_pt > 10 && abs(Muon_eta) < 2.4 && {isolation}"
     df = df.Define("good_muons", f"{kinematic} && Muon_mediumId && abs(Muon_dz) < 0.1 && abs(Muon_dxy) < 0.05")
     df = df.Define("loose_muons", f"{kinematic} && Muon_looseId && abs(Muon_dz) < 1 && abs(Muon_dxy) < 0.5")
     df = track(df, "n_goodMuons", "int(ROOT::VecOps::Sum(good_muons))")
@@ -246,10 +250,11 @@ def define_muons(df, muon_columns, trigger_config, filippo, inclusive=False, raw
     if not inclusive:
         df = df.Filter(" || ".join(trigger_filters), "Trigger matching for " + "__".join(trigger_config))
 
+    sort_pt = "Muon_pt"
     index_mask = f"Muon_pt > {raw_pt_min}" if inclusive else "good_muons"
     df = df.Define("sync_preselection_muons", index_mask)
     df = df.Define("good_idx", "ROOT::VecOps::Nonzero(sync_preselection_muons)")
-    df = df.Define("sorted_idx_raw", "Reverse(Take(good_idx, Argsort(Take(Muon_pt, good_idx))))")
+    df = df.Define("sorted_idx_raw", f"Reverse(Take(good_idx, Argsort(Take({sort_pt}, good_idx))))")
     if pisa:
         # Pisa candidate: exactly two good and exactly two loose muons.  Their pair
         # replaces the raw-pT pairing, whatever its pT (good muons start at 10 GeV).
@@ -363,14 +368,15 @@ def main():
     dataset_cfg = samples[args.dataset_name]
     is_data = bool(dataset_cfg.get("is_data", False))
     inclusive = args.variant.startswith("ggfvbf")
-    pisa = args.variant == "ggfvbf_pisa_20261013"
+    pisa = args.variant in ("ggfvbf_pisa_20261013", "ggfvbf_iso_20261014")
+    std_iso = args.variant == "ggfvbf_iso_20261014"
     raw_pt_min = 10.0 if args.dataset_name in {
         "TTH_Hto2Mu", "ZH_Hto2Mu", "WplusH_Hto2Mu",
     } else 20.0
     sel_config = utilities.get_config(str(config_dir / "selections.yaml"))
     from common.jet_horn_policy import configure_horn_veto, horn_mitigation_enabled
     configure_horn_veto(sel_config, ERA, "configured")
-    filippo = args.variant in ("filippo_20260925", "ggfvbf_pisa_20261013")
+    filippo = args.variant in ("filippo_20260925", "ggfvbf_pisa_20261013", "ggfvbf_iso_20261014")
     if filippo:
         # Filippo's horn: 2.5 < |eta| < 3.0, |eta| = 2.5 excluded.
         sel_config["jet_horn_veto_expr"] = ("(abs(v_ops::eta(Jet_p4)) > 2.5 && abs(v_ops::eta(Jet_p4)) < 3.0 "
@@ -434,7 +440,7 @@ def main():
         from analysis.other import applyMETFlags
         df = applyMETFlags(df, config, is_data)
     if pisa:
-        # Pisa applies the MET filters as a skim filter: keep the decision as a flag.
+        # the MET filters (and, for MC, the golden-JSON flag) are stored as flags, not applied
         from analysis.other import applyBadMETfilter
         if config.get("badMET_flag_runs"):
             df = applyBadMETfilter(df, config["badMET_flag_runs"], is_data)
@@ -445,7 +451,7 @@ def main():
     from analysis.muons import DefineMuonPtAndP4
     df = DefineMuonPtAndP4(df, False)
     muon_columns = utilities.GetObservablesCols("Muon", is_data, nano_version)
-    df, cols = define_muons(df, muon_columns, trigger_config, filippo, inclusive, raw_pt_min, pisa)
+    df, cols = define_muons(df, muon_columns, trigger_config, filippo, inclusive, raw_pt_min, pisa, std_iso)
     if not is_data and inclusive:
         from corrections.mu import apply_muIDIso_weights
         from common.trigger_weights import AddTriggerWeightsAndErrors
@@ -545,14 +551,14 @@ def main():
     keep = sync_tuple.selected_columns(df, False, extended=inclusive)
     extra = cols + mc_cols + ["sample", "sample_id", "MET_pt", "MET_phi", "MET_collection",
                     "pass_golden_json", "pass_met_filters", "sync_preselection",
-                    "n_goodMuons", "n_looseMuons", "pisa_candidate",
+                    "n_goodMuons", "n_looseMuons",
                     "SelectedJetTagSel", "JetTagSel", "exactly_2_loose_muons", "bothMuons_ML",
                     "electron_veto", "m_mumu_nano",
                     "pt_mumu_nano", "m_mumu_nano_corr", "m_mumu_FSR_corr"]
     available = sync_tuple.columns(df)
     if inclusive:
         extra += sorted(name for name in available if name.startswith("Flag_"))
-    keep = sorted(c for c in set(keep) | {c for c in extra if c in available} if "_p4" not in c)
+    keep = sorted(c for c in set(keep) | {c for c in extra if c in available} if "_p4" not in c and "pisa" not in c.lower())
 
     cutflows = {}
     count_actions = []

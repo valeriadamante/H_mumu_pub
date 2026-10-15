@@ -31,8 +31,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import uproot  # noqa: E402
 
-BASE = Path("/eos/cms/store/group/phys_higgs/cmshmm/run3_sync")
-CHANNELS = ("ggH", "VBF")
+BASE = Path(os.environ.get("HMUMU_SYNC_BASE", "/eos/cms/store/group/phys_higgs/cmshmm/run3_sync"))   # directory with one folder per group
+CHANNELS = ("ggH", "VBF", "inclusive", "VBF_onlyLeading", "ggH_noVBF_onlyLeading")
+BASE_CHANNELS = ("ggH", "VBF")      # the groups' own categories; the two *_onlyLeading channels are derived from them
 REGIONS = {
     "Z_sideband": (lambda m: (m > 70) & (m < 110), "70 < m(mumu) < 110 GeV"),
     "H_sideband": (lambda m: ((m > 110) & (m < 115)) | ((m > 135) & (m < 150)),
@@ -43,7 +44,7 @@ BLINDED = {("Data_Run2024H", "Signal_Fit")}   # no distributions of data in the 
 MC_MODES = ("genWeights", "all_common_weights")
 RESIDUAL_TOLERANCE = 1e-3                        # relative, on events selected by both groups
 UNDEFINED = -9999.0                              # a jet that does not exist
-HELPERS = {"abs": np.abs, "sqrt": np.sqrt, "pi": math.pi, "cos": np.cos, "sin": np.sin, "sinh": np.sinh,
+HELPERS = {"abs": np.abs, "sqrt": np.sqrt, "pi": math.pi, "cos": np.cos, "sin": np.sin, "sinh": np.sinh, "cosh": np.cosh,
            "arcsinh": np.arcsinh, "arctan2": np.arctan2, "hypot": np.hypot,
            "dphi": lambda a, b: (a - b + math.pi) % (2 * math.pi) - math.pi}
 
@@ -78,7 +79,16 @@ class Variable:
 
 def V(name, title, bins, TAMU=None, Marmara=None, PKU=None, NNU=None, min_jets=0, Pisa=None):
     return Variable(name, title, np.asarray(bins), {"TAMU": TAMU, "Marmara": Marmara, "PKU": PKU, "NNU": NNU, "Pisa": Pisa,
-                                                      "Purdue": PURDUE_EXPR.get(name)}, min_jets)
+                                                      "Purdue": PURDUE_EXPR.get(name), "MIT": MIT_EXPR.get(name)}, min_jets)
+
+
+# MIT branches (variable name -> expression); the jets are the VBF dijet (-1 when there is no dijet)
+MIT_EXPR = {
+    "m_mumu": "HiggsCandCorrMass", "mu1_pt": "Muon1_pt", "mu2_pt": "Muon2_pt", "mu1_eta": "Muon1_eta", "mu2_eta": "Muon2_eta",
+    "mu1_phi": "Muon1_phi", "mu2_phi": "Muon2_phi", "met_pt": "PuppiMET_pt", "met_phi": "PuppiMET_phi", "njets": "nGoodJetsAll",
+    "n_bjets_medium": "nBMJets", "jet1_pt": "jetVBF1_Pt", "jet2_pt": "jetVBF2_Pt", "jet1_eta": "jetVBF1_Eta", "jet2_eta": "jetVBF2_Eta",
+    "mjj": "Mjj", "deta_jj": "abs(jetVBF1_Eta - jetVBF2_Eta)",
+}
 
 
 # Purdue branches (variable name -> expression); jets are the two leading selected jets (`*_nominal`)
@@ -123,13 +133,65 @@ VARIABLES = [
     V("jet2_pt", r"subleading jet $p_T$ [GeV]", np.linspace(0, 200, 51), "subleadingjet_pt", "byrank(jet_pt, jet_passAnalysis, jet_pt, 1)", "jet2_pt", "jet2pt", 2, Pisa="SubLeadingJet_ptToUse"),
     V("jet2_eta", r"subleading jet $\eta$", JETETA, "subleadingjet_eta", "byrank(jet_eta, jet_passAnalysis, jet_pt, 1)", "jet2_eta", "jet2eta", 2, Pisa="SubLeadingJet_eta"),
     V("jet2_phi", r"subleading jet $\phi$", PHI, "subleadingjet_phi", "byrank(jet_phi, jet_passAnalysis, jet_pt, 1)", "jet2_phi", None, 2, Pisa="SubLeadingJet_phi"),
-    V("mjj", r"$m_{jj}$ [GeV]", np.linspace(0, 2000, 51), "dijet_ls_mass", "jj_mass", "dijet_mass", "dijetmass", 2, Pisa="Dijet_mass"),
+    V("mjj", r"$m_{jj}$ [GeV]", np.linspace(0, 2000, 51), "dijet_ls_mass", "jj_mass[:,0]", "dijet_mass", "dijetmass", 2, Pisa="Dijet_mass"),
     V("pt_jj", r"$p_T^{jj}$ [GeV]", np.linspace(0, 400, 51), "dijet_ls_pt", "jj_pt", "dijet_pt", "dijetpt", 2, Pisa="Dijet_pt"),
     V("eta_jj", r"$\eta_{jj}$", np.linspace(-8, 8, 51), "dijet_ls_eta", "jj_eta", "dijet_eta", "dijeteta", 2, Pisa="Dijet_eta"),
-    V("deta_jj", r"$|\Delta\eta_{jj}|$", np.linspace(0, 10, 51), "abs(leadingjet_eta-subleadingjet_eta)", "abs(jj_deta)", "abs(delta_eta_jj)", "absDetajj", 2, Pisa="abs(Dijet_DeltaEta)"),
+    V("deta_jj", r"$|\Delta\eta_{jj}|$", np.linspace(0, 10, 51), "abs(leadingjet_eta-subleadingjet_eta)", "abs(jj_deta[:,0])", "abs(delta_eta_jj)", "absDetajj", 2, Pisa="abs(Dijet_DeltaEta)"),
     V("dphi_jj", r"$|\Delta\phi_{jj}|$", np.linspace(0, math.pi, 33), "abs(dphi(leadingjet_phi,subleadingjet_phi))", None, "abs(delta_phi_jj)", "abs(dijetdphi)", 2),
     V("soft_activity_njets5", "soft-activity jets, $p_T>5$ GeV", np.arange(-0.5, 15.5, 1), None, None, "SoftActivityJetNjets5", "SoftActivityJetNjets5_tmva"),
 ]
+
+
+def _expr(group, name):
+    return next(v.expr.get(group) for v in VARIABLES if v.name == name)
+
+
+def _set(name, **per_group):
+    next(v for v in VARIABLES if v.name == name).expr.update(per_group)
+
+
+# MIT: `Muon*_rawpt` is taken as the uncorrected (NanoAOD) muon pT, the uncorrected dimuon quantities are built from it
+_set("mu1_pt_nano", MIT="Muon1_rawpt")
+_set("mu2_pt_nano", MIT="Muon2_rawpt")
+_set("m_mumu_uncorrected", MIT="sqrt(2*Muon1_rawpt*Muon2_rawpt*(cosh(Muon1_eta-Muon2_eta)-cos(Muon1_phi-Muon2_phi)))")
+
+_ALL = ("TAMU", "Marmara", "PKU", "NNU", "Pisa", "Purdue", "MIT")
+
+
+def _derived(name, title, bins, build, min_jets=0, native=None):
+    """A variable built group by group from the expressions of other variables (None if one of them is missing)."""
+    expr = {g: (native or {}).get(g) or build(g) for g in _ALL}
+    VARIABLES.append(Variable(name, title, np.asarray(bins), expr, min_jets))
+
+
+def _pair(fn, *names):
+    def build(g):
+        parts = [_expr(g, n) for n in names]
+        return None if any(p is None for p in parts) else fn(*[f"({p})" for p in parts])
+    return build
+
+
+_derived("pt_mumu_uncorrected", r"uncorrected $p_T^{\mu\mu}$ [GeV]", np.linspace(0, 250, 51),
+         lambda g: None if None in (_expr(g, "mu1_pt_nano"), _expr(g, "mu2_pt_nano"), _expr(g, "mu1_phi"), _expr(g, "mu2_phi")) else
+         f"sqrt(({_expr(g, 'mu1_pt_nano')})**2+({_expr(g, 'mu2_pt_nano')})**2+2*({_expr(g, 'mu1_pt_nano')})*({_expr(g, 'mu2_pt_nano')})"
+         f"*cos(({_expr(g, 'mu1_phi')})-({_expr(g, 'mu2_phi')})))",
+         native={"TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "NNU": "dimuon_raw_pt", "Pisa": "Dimuon_rawPt", "Purdue": "dimuon_pt_raw"})
+_derived("mu1_charge", "leading $\mu$ charge", np.arange(-1.5, 2.5, 1), lambda g: None,
+         native={"TAMU": "mu1_charge", "Marmara": "mu_charge[:,0]", "PKU": "mu1_fromH_charge", "NNU": "mu1_charge", "Pisa": "LeadingMuon_charge",
+                 "Purdue": "mu1_charge", "MIT": "Muon1_charge"})
+_derived("mu2_charge", "subleading $\mu$ charge", np.arange(-1.5, 2.5, 1), lambda g: None,
+         native={"TAMU": "mu2_charge", "Marmara": "mu_charge[:,1]", "PKU": "mu2_fromH_charge", "NNU": "mu2_charge", "Pisa": "SubLeadingMuon_charge",
+                 "Purdue": "mu2_charge", "MIT": "Muon2_charge"})
+_derived("deta_mumu", r"$|\Delta\eta_{\mu\mu}|$", np.linspace(0, 5, 51), _pair(lambda a, b: f"abs({a}-{b})", "mu1_eta", "mu2_eta"))
+_derived("dphi_mumu", r"$|\Delta\phi_{\mu\mu}|$", np.linspace(0, math.pi, 33), _pair(lambda a, b: f"abs(dphi({a},{b}))", "mu1_phi", "mu2_phi"))
+_derived("dR_mumu", r"$\Delta R_{\mu\mu}$", np.linspace(0, 6, 61),
+         lambda g: None if None in (_expr(g, "mu1_eta"), _expr(g, "mu2_eta"), _expr(g, "mu1_phi"), _expr(g, "mu2_phi")) else
+         f"hypot(({_expr(g, 'mu1_eta')})-({_expr(g, 'mu2_eta')}),dphi({_expr(g, 'mu1_phi')},{_expr(g, 'mu2_phi')}))")
+_derived("mu1_pt_over_mmumu", r"leading $\mu$ $p_T/m_{\mu\mu}$", np.linspace(0, 3, 61), _pair(lambda a, b: f"{a}/{b}", "mu1_pt", "m_mumu"))
+_derived("mu2_pt_over_mmumu", r"subleading $\mu$ $p_T/m_{\mu\mu}$", np.linspace(0, 2, 41), _pair(lambda a, b: f"{a}/{b}", "mu2_pt", "m_mumu"))
+_derived("zeppenfeld", r"Zeppenfeld $\eta_{\mu\mu}-(\eta_{j1}+\eta_{j2})/2$", np.linspace(-6, 6, 61),
+         lambda g: None if None in (_expr(g, "eta_mumu"), _expr(g, "jet1_eta"), _expr(g, "jet2_eta")) else
+         f"({_expr(g, 'eta_mumu')})-(({_expr(g, 'jet1_eta')})+({_expr(g, 'jet2_eta')}))/2", min_jets=2)
 
 
 def tamu_files():
@@ -151,17 +213,15 @@ def treat_TAMU_ntuple():
          "all_common_weights": "weight_generator*weight_pileup*weight_muon_idiso*weight_trigger"},
         ["pass_golden_json", "pass_met_filters", "HLT_IsoMu24", "Event_HasTriggerMatching_singleMu", "muons_trigger",
          "muons_OS", "mu_pt_sel", "bothMuons_ML", "exactly_2_loose_muons", "electron_veto", "jets_btag_clean_sel",
-         "pisa_candidate", "baseline", "VBF", "ggF"],
-        ["Channels are the stored Pisa-style `ggF` / `VBF` flags (baseline, then VBF = two leading jets pass 35/25 GeV, "
-         "m_jj > 400, |deta| > 2.5; ggF = baseline and not VBF). Pisa's exchange tuples use 30/30 GeV jets, so jet-related "
-         "differences are expected (decision 2026-10-14: TAMU keeps 35/25).",
-         "The dimuon is the pair of the single good muon pair (exactly 2 good and 2 loose muons) whenever it exists "
-         "(`pisa_candidate`); otherwise the two highest-pT NanoAOD muons."])
+         "baseline", "VBF", "ggF"],
+        ["Channels are the stored `ggF` / `VBF` flags (baseline, then VBF = two leading jets pass 35/25 GeV, m_jj > 400, |deta| > 2.5; "
+         "ggF = baseline and not VBF).",
+         "The dimuon is formed by the two candidate muons stored as `mu1` and `mu2`."])
 
 
 def treat_Marmara_ntuple():
     return GroupSpec(
-        "Marmara", {"Data_Run2024H": "Marmara/tree_DATA_2024_loose_larger_stat_Data_File.root", "ggH": "Marmara/tree_GGH_2024_loose_LAST.root",
+        "Marmara", {"Data_Run2024H": "Marmara/tree_DATA_2024_loose_for_ALL_2024_H_Data_Samples.root", "ggH": "Marmara/tree_GGH_2024_loose_LAST.root",
                     "VBFH": "Marmara/tree_VBF_2024_loose_LAST.root"},
         "HmmTree", "lumi", "mm_mass_fsr",
         {"ggH": "sel_full & cat_isGGH[:,0]", "VBF": "sel_full & cat_isVBF[:,0]"},
@@ -172,7 +232,7 @@ def treat_Marmara_ntuple():
          "is `sel_full && cat_*[0]`.  Index 0 of the two-element category arrays is used; the meaning of index 1 "
          "should be confirmed by Marmara.",
          "Jets are the entries of the jet arrays with `jet_passAnalysis` (`nJetsAna` of them), ranked by `jet_pt` because the arrays are not pT-ordered (92% of events have the largest-pT jet first); `jj_*` is their leading pair. Which jet-energy corrections `jet_pt` carries (it differs from the other groups' corrected pT by a median of a few GeV) has to be confirmed with Marmara.",
-         "Data: `tree_DATA_2024_loose_larger_stat_Data_File.root` is a **partial** sample (about 0.8M events, i.e. a few input files), so coverage against the full-statistics tuples is low by construction and only the events in common are meaningful; `data_Run2024H_Muon*.root` are NanoAOD inputs.",
+         "Data: `tree_DATA_2024_loose_for_ALL_2024_H_Data_Samples.root` (4.5M events, full Run2024H, replaces the earlier partial `larger_stat` file); `data_Run2024H_Muon*.root` are NanoAOD inputs.",
          "The `GluGluH-...root` / `VBFH-...root` files are NanoAOD too; the `tree_*_loose_LAST.root` tuples are used."])
 
 
@@ -216,18 +276,22 @@ def treat_Pisa_ntuple():
                  "ggH": "PISA/PISA-GluGluH-Hto2Mu_Par-M-125_2024Summer24NanoAODv15-v2/Events.root",
                  "VBFH": "PISA/PISA-VBFH-Hto2Mu_Par-M-125_2024Summer24NanoAODv15-v2/Events.root"},
         "Events", "luminosityBlock", "Dimuon_mass",
-        {"ggH": "first_failed_step < -1", "VBF": "(first_failed_step == 0) | (first_failed_step >= 18)"},
-        {"genWeights": "Generator_weight", "all_common_weights": "HiggsMass_cumulativeWeight"},
+        {"ggH": "(first_failed_step >= 13) & (first_failed_step <= 16) & (nMediumBTagJet == 0) & (nLooseBTagJet < 2)",
+         "VBF": "(first_failed_step == 0) | (first_failed_step >= 18)"},
+        {"genWeights": "Generator_weight", "all_common_weights": "Generator_weight*PuSF*MuIdIsoSF*MuTrgSF"},
         ["pass_NoiseFilters", "pass_GoldenJson", "pass_isTriggered", "pass_AtLeastOneTrgMuon", "pass_TwoMuons", "pass_TwoOppositeSignMuons",
          "pass_LeadingMuonCut", "pass_EleVeto", "pass_AdditionalMuonVeto", "pass_RawDimuonMassWindow", "pass_TwoJets", "pass_LeadingJetPt",
          "pass_DijetMass", "pass_DijetDeltaEta", "pass_BJetVeto"],
-        ["Pisa publishes only the **VBF cutflow**: there is no ggH category (the ggH cells are empty).  The tuple holds the events that "
-         "reach the raw-mass window (about 1.9M per data dataset), with `first_failed_step` telling where each one stops; the VBF channel is "
-         "every cut but the mass window passing.  Data in the signal window are blinded and absent.",
-         "Variable mapping checked against the TAMU Pisa-like tuple on common events: `Dimuon_mass` is the FSR-recovered, bs-constrained, ScaRe mass "
+        ["Pisa publishes only the **VBF cutflow**, with no ggH category.  The tuple holds the events that reach the raw-mass window "
+         "(about 1.9M per data dataset), with `first_failed_step` telling where each one stops; the VBF channel is every cut but the mass "
+         "window passing.  Our reconstruction of a ggH channel (to be confirmed by Pisa): events that pass every cut before the jets "
+         "(`first_failed_step` 13-16, i.e. fail the VBF jet requirements) and the b-veto recomputed from the jet counts (no medium b jet and fewer "
+         "than two loose ones; the published `pass_BJetVeto` is cumulative and not evaluated for those events), the analogue of TAMU's "
+         "`ggF = baseline and not VBF`.  Data in the signal window are blinded and absent.",
+         "Variable mapping checked against the TAMU tuple on common events: `Dimuon_mass` is the FSR-recovered, bs-constrained, ScaRe mass "
          "(0.4% of events differ from TAMU `m_mumu_FSR_corr`); `LeadingMuon_pt` is the NanoAOD pT and `LeadingMuon_ptToUse` the corrected one; "
          "`LeadingJet_ptToUse` is the corrected jet pT (`LeadingJet_pt` is uncorrected).",
-         "MET is PuppiMET.  There is no dimuon eta/phi and no dphi_jj.  `all_common_weights` is `HiggsMass_cumulativeWeight` (MC only)."])
+         "MET is PuppiMET.  There is no dimuon eta/phi and no dphi_jj.  `all_common_weights` is `Generator_weight*PuSF*MuIdIsoSF*MuTrgSF` (MC only): the published `HiggsMass_cumulativeWeight` is the same product but is zero for every event that does not pass the whole VBF selection, so it cannot be used outside the VBF channel and the mass window."])
 
 
 def treat_Purdue_ntuple():
@@ -253,13 +317,60 @@ def treat_Purdue_ntuple():
          "`all_common_weights` is `wgt_nominal` (1 in data)."])
 
 
+def treat_MIT_ntuple():
+    """MIT exchange tuples (`MIT/VBF-GGH/snapshot_mc_<id>_2024_ggHcat_synch.root`, tree `events`): ggH + VBF selection with the
+    b-veto relaxed.  mc_10 = VBFH, mc_11 = ggH (GluGluHto2Mu, powheg), mc_-51 / mc_-52 = Run2024H Muon0 / Muon1 (info.txt of the group)."""
+    d = "MIT/VBF-GGH/snapshot_mc_{}_2024_ggHcat_synch.root"
+    return GroupSpec(
+        "MIT", {"Data_Run2024H": [d.format("-51"), d.format("-52")], "ggH": d.format("11"), "VBFH": d.format("10")},
+        "events", "luminosityBlock", "HiggsCandCorrMass",
+        {"ggH": "(nBMJets == 0) & ~((Mjj > 400) & (abs(jetVBF1_Eta - jetVBF2_Eta) > 2.5))",
+         "VBF": "(nBMJets == 0) & (Mjj > 400) & (abs(jetVBF1_Eta - jetVBF2_Eta) > 2.5)"},
+        {"genWeights": "w", "all_common_weights": "w_allSF"},
+        [],
+        ["The tuple has no category flag: it stores the ggH + VBF selection with the b-veto relaxed (`nBMJets` up to 3) and the extra mu-e veto on. "
+         "Our reading of the channels: `nBMJets == 0` and VBF = `Mjj > 400` and |deta(jetVBF1, jetVBF2)| > 2.5, ggH = the rest; to be confirmed by MIT.",
+         "Jets: the VBF dijet (`jetVBF1/2_*`, pT > 30 GeV, -1 when absent) and `nGoodJetsAll`; `Muon1/2_rawpt` is not mapped. Region flags `isZ/isH/isHSB` are not used: the regions are rebuilt from `HiggsCandCorrMass`.",
+         "Weights: `w` (cross-section, luminosity and generator weight, without scale factors) and `w_allSF` (with all scale factors); both 1 in data."])
+
+
 TREATERS = {"TAMU": treat_TAMU_ntuple, "Marmara": treat_Marmara_ntuple,
-            "PKU": treat_PKU_ntuple, "NNU": treat_NNU_ntuple, "Pisa": treat_Pisa_ntuple, "Purdue": treat_Purdue_ntuple}
+            "PKU": treat_PKU_ntuple, "NNU": treat_NNU_ntuple, "Pisa": treat_Pisa_ntuple, "Purdue": treat_Purdue_ntuple, "MIT": treat_MIT_ntuple}
+
+
+LEADING_PT_MIN = 30      # both leading jets, as in Pisa's VBF selection
+LEADING_MJJ_MIN = 400
+LEADING_DETA_MIN = 2.5
+
+
+def add_leading_channels(spec):
+    """inclusive: ggH | VBF of the group.  VBF_onlyLeading: the group's baseline (ggH | VBF) with the VBF requirements applied to the two leading jets only (pT > 30 GeV
+    both, m_jj > 400 GeV, |deta_jj| > 2.5, as Pisa does); ggH_noVBF_onlyLeading: the rest of the baseline.  Built from the group's own
+    jet variables, which are those of the two leading jets (TAMU: `*_ls`, Pisa: Dijet).  For MIT, whose own VBF/ggH
+    selection is already the one on the two leading jets, they are its default VBF and ggH."""
+    v = spec.variables
+    base = f"(({spec.channels['ggH']}) | ({spec.channels['VBF']}))"
+    spec.channels["inclusive"] = base                      # ggH | VBF
+    if spec.name == "MIT":
+        # MIT's own VBF/ggH selection is already the one on the two leading jets (as Pisa's): its defaults are used
+        spec.channels["VBF_onlyLeading"] = spec.channels["VBF"]
+        spec.channels["ggH_noVBF_onlyLeading"] = spec.channels["ggH"]
+        return
+    if any(k not in v for k in ("jet1_pt", "jet2_pt", "mjj", "deta_jj")):
+        spec.channels["VBF_onlyLeading"] = f"({spec.mass} < 0)"
+        spec.channels["ggH_noVBF_onlyLeading"] = f"({spec.mass} < 0)"
+        return
+    vbf = (f"{base} & (({v['jet1_pt']}) > {LEADING_PT_MIN}) & (({v['jet2_pt']}) > {LEADING_PT_MIN}) & "
+           f"(({v['mjj']}) > {LEADING_MJJ_MIN}) & (({v['deta_jj']}) > {LEADING_DETA_MIN})")
+    spec.channels["VBF_onlyLeading"] = vbf
+    spec.channels["ggH_noVBF_onlyLeading"] = f"{base} & ~({vbf})"
 
 
 def treat(group):
     spec = TREATERS[group]()
     spec.variables = {v.name: v.expr[group] for v in VARIABLES if v.expr.get(group)}
+    spec.channels = dict(spec.channels)
+    add_leading_channels(spec)
     return spec
 
 
@@ -406,9 +517,9 @@ def selection(e, region, channel):
 
 def destination_labels(e):
     """For every kept event the first 'channel / region' it belongs to (index into the label list)."""
-    names_ = [f"{channel} / {region}" for channel in CHANNELS for region in REGIONS] + ["outside 70-150 GeV or ggH/VBF"]
+    names_ = [f"{channel} / {region}" for channel in BASE_CHANNELS for region in REGIONS] + ["outside 70-150 GeV or ggH/VBF"]
     code = np.full(len(e.keys), len(names_) - 1)
-    for i, (channel, region) in reversed(list(enumerate((c, r) for c in CHANNELS for r in REGIONS))):
+    for i, (channel, region) in reversed(list(enumerate((c, r) for c in BASE_CHANNELS for r in REGIONS))):
         code[selection(e, region, channel)] = i
     return code, names_
 
@@ -437,14 +548,19 @@ def distance(a, b):
     return float(0.5 * np.abs(a / a.sum() - b / b.sum()).sum()) if a.sum() and b.sum() else math.nan
 
 
-def draw(ha, hb, bins, title, labels, heading, out):
+def draw(ha, hb, bins, title, labels, heading, out, na=None, nb=None):
     width = np.diff(bins)
+    # top panel: events per bin (sum of weights for MC); the ratio panel compares the unit-normalised shapes
     ya = ha / ha.sum() / width if ha.sum() else ha
     yb = hb / hb.sum() / width if hb.sum() else hb
     fig, (ax, rax) = plt.subplots(2, 1, figsize=(7, 7), sharex=True, gridspec_kw={"height_ratios": [3, 1], "hspace": .05})
-    ax.stairs(ya, bins, label=labels[0], linewidth=1.7)
-    ax.stairs(yb, bins, label=labels[1], linewidth=1.7)
-    ax.set_ylabel("unit-normalised density")
+    # each group's (weighted) shape is scaled to its number of selected events, so that groups with incompatible weight
+    # normalisations (raw generator weight, cross-section x luminosity, ...) are drawn on a comparable scale
+    ca = ha / ha.sum() * na if (na and ha.sum()) else ha
+    cb = hb / hb.sum() * nb if (nb and hb.sum()) else hb
+    ax.stairs(ca, bins, label=labels[0], linewidth=1.7)
+    ax.stairs(cb, bins, label=labels[1], linewidth=1.7)
+    ax.set_ylabel("events / bin" if heading.endswith("unweighted") else "weighted events / bin")
     ax.set_title(heading, fontsize=10)
     ax.legend()
     # a bin empty in either histogram has no meaningful ratio: leave it undefined (NaN) instead of a point at zero
@@ -454,13 +570,20 @@ def draw(ha, hb, bins, title, labels, heading, out):
     rax.errorbar(centres, ratio, xerr=width / 2, fmt="o", color="C0", markersize=3, linestyle="none", elinewidth=1)
     finite = ratio[np.isfinite(ratio)]
     spread = float(np.max(np.abs(finite - 1))) if finite.size else 0.
-    half = min(max(1.2 * spread, 0.02), 0.5)      # zoom on the differences, never wider than 0.5-1.5
-    rax.set_ylim(1 - half, 1 + half)
-    rax.set_ylabel(f"{labels[0]} /\n{labels[1]}")
+    ratio_axis(rax, spread)
+    rax.set_ylabel(f"{labels[0]} /\n{labels[1]}\n(shapes)")
     rax.set_xlabel(title)
     fig.savefig(out.with_suffix(".png"), dpi=130, bbox_inches="tight")
     fig.savefig(out.with_suffix(".pdf"), bbox_inches="tight")
     plt.close(fig)
+
+
+def ratio_axis(rax, spread):
+    """Ratio panel: 5% (green) and 10% (yellow) bands, range 0.8-1.2 extended only if the points exceed it."""
+    rax.axhspan(0.90, 1.10, color="gold", alpha=0.25, linewidth=0, zorder=0)
+    rax.axhspan(0.95, 1.05, color="limegreen", alpha=0.35, linewidth=0, zorder=0)
+    half = min(max(0.2, 1.1 * spread), 1.0)
+    rax.set_ylim(1 - half, 1 + half)
 
 
 def migration(selected_keys, other, other_selected_keys):
@@ -507,6 +630,33 @@ def compare_cell(a, b, region, channel):
     return cell, (sa, sb)
 
 
+def draw_flags(flags, ga, gb, heading, out):
+    """Fraction of the selected events passing each boolean flag, one panel per group (the flags are the groups' own)."""
+    panels = [(g, flags[g]) for g in (ga, gb) if flags.get(g)]
+    if not panels or all(v["total"] == 0 for _, d in panels for v in d.values()):
+        return
+    height = max(len(d) for _, d in panels) * 0.32 + 1.6
+    fig, axes = plt.subplots(1, len(panels), figsize=(5.2 * len(panels), height), squeeze=False)
+    for ax, (g, d) in zip(axes[0], panels):
+        names_ = list(d)
+        frac = [v["passed"] / v["total"] if v["total"] else math.nan for v in d.values()]
+        ax.barh(range(len(names_)), frac, color="C0" if g == ga else "C1")
+        ax.set_yticks(range(len(names_)))
+        ax.set_yticklabels(names_, fontsize=8)
+        ax.invert_yaxis()
+        ax.set_xlim(0, 1.05)
+        ax.set_xlabel("fraction of selected events passing")
+        ax.set_title(f"{g}", fontsize=10)
+        for i, f in enumerate(frac):
+            if math.isfinite(f):
+                ax.text(min(f + 0.01, 0.98), i, f"{f:.4f}", va="center", fontsize=7)
+    fig.suptitle(heading, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(out.with_suffix(".png"), dpi=120, bbox_inches="tight")
+    fig.savefig(out.with_suffix(".pdf"), bbox_inches="tight")
+    plt.close(fig)
+
+
 def compare_distributions(a, b, region, channel, sample, selections, leaf):
     """Shapes, weighted sums and plots of every common variable."""
     sa, sb = selections
@@ -526,7 +676,7 @@ def compare_distributions(a, b, region, channel, sample, selections, leaf):
             entry["variables"][v.name] = {"title": v.title, "entries": {a.group: na, b.group: nb},
                                           "mean": {a.group: ma, b.group: mb}, "std": {a.group: sda, b.group: sdb},
                                           "shape_distance": distance(ha, hb)}
-            draw(ha, hb, v.bins, v.title, (f"{a.group} ({na:,})", f"{b.group} ({nb:,})"), f"{sample} - {region} - {channel} - {mode}", folder / v.name)
+            draw(ha, hb, v.bins, v.title, (f"{a.group} ({na:,})", f"{b.group} ({nb:,})"), f"{sample} - {region} - {channel} - {mode}", folder / v.name, na, nb)
         result[mode] = entry
     return result
 
@@ -617,7 +767,7 @@ def leaf_markdown(r, region, channel, sample, path):
             out += ["", f"## Distributions: {mode}", "",
                     f"Sum of weights: {ga} {fmt(entry['sum_weights'][ga], 6)}, {gb} {fmt(entry['sum_weights'][gb], 6)} "
                     f"(ratio {fmt(entry['sum_weights'][ga] / entry['sum_weights'][gb] if entry['sum_weights'][gb] else None, 5)}). "
-                    "The groups normalise their weights differently, so the ratio of the sums is not a yield comparison. Shapes are unit-normalised; the total-variation distance is 0 for identical shapes and 1 for disjoint ones.", "",
+                    "The groups normalise their weights differently, so the ratio of the sums is not a yield comparison. The plots show events per bin (for MC arbitrary units, A.U.: the weighted shape of each group scaled to its number of selected events, because the weight normalisations differ); the ratio panel and the total-variation distance use the unit-normalised shapes; the distance is 0 for identical shapes and 1 for disjoint ones.", "",
                     f"| variable | {ga} mean | {gb} mean | {ga} std | {gb} std | shape distance | plot |", "|---|---:|---:|---:|---:|---:|---|"]
             for k, v in sorted(entry["variables"].items(), key=lambda kv: -(kv[1]["shape_distance"] if math.isfinite(kv[1]["shape_distance"]) else -1)):
                 out.append(f"| `{k}` | {fmt(v['mean'][ga])} | {fmt(v['mean'][gb])} | {fmt(v['std'][ga])} | {fmt(v['std'][gb])} | "
@@ -626,9 +776,11 @@ def leaf_markdown(r, region, channel, sample, path):
     out += ["## Selection flags among the selected events", "", "| group | flag | passing / selected |", "|---|---|---:|"]
     for g in (ga, gb):
         out += [f"| {g} | `{f}` | {v['passed']:,} / {v['total']:,} |" for f, v in cell["flags"][g].items()]
+    if any(cell["flags"][g] for g in (ga, gb)) and cell["selected"][ga] + cell["selected"][gb]:
+        out += ["", "![flags](flags.png)"]
     out += ["", "## Limits of this diagnosis", "",
             "- Flags with similar names are not assumed to have identical definitions.",
-            "- Every group's corrected quantities are used as published; shapes are unit-normalised, so overall normalisation differences do not show up in the plots.",
+            "- Every group's corrected quantities are used as published; the top panel shows events per bin (MC: A.U., weighted shape scaled to the selected events), but the ratio panel and the shape distances are unit-normalised, so overall normalisation differences do not enter them.",
             "- A definitive cause requires the object-level (muon index, first-failed cut) comparison on the events selected by only one group.", ""]
     for g in (ga, gb):
         out += [f"- {g}: {note}" for note in r["treatment"][g]["notes"]]
@@ -651,6 +803,7 @@ def compare_pair(ga, gb, sample, output, cache_dir, regions, channels):
             leaf.mkdir(parents=True, exist_ok=True)
             cell, selections = compare_cell(a, b, region, channel)
             r["cells"][region][channel] = cell
+            draw_flags(cell["flags"], ga, gb, f"{sample} - {region} - {channel} - flags", leaf / "flags")
             if (sample, region) not in BLINDED:
                 r["distributions"][region][channel] = compare_distributions(a, b, region, channel, sample, selections, leaf)
             else:
@@ -847,9 +1000,6 @@ def write_pair_summary(output, ga, gb):
            "a proof needs the object-level comparison (muon indices, first failed cut) of the one-sided events.", "",
            "Thresholds: *in sync* means at least 99% of the smaller selection is common, *mostly in sync* 90-99%. A shape distance is the total-variation "
            "distance of the unit-normalised distributions (0 identical, 1 disjoint); above 0.05 is a visible difference.", ""]
-    if "TAMU" in (ga, gb):
-        out += ["> **Provisional**: this pair uses the TAMU exchange files published before the Pisa-like regeneration "
-                "(variant `ggfvbf_20261015`). It must be regenerated with the new `ggfvbf_pisa_20261013` tuples.", ""]
     out += ["## Quantitative overview", "",
             f"| sample | region | channel | {ga} | {gb} | both | {ga}/{gb} | common / smaller | status | {ga} only (absent / present) | {gb} only (absent / present) | largest shape distance | largest event-by-event mismatch |",
             "|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|---|"]
@@ -888,7 +1038,8 @@ def draw_all(hists, bins, title, heading, out):
     rax.axhline(1, color="black", linewidth=.8)
     spread = 0.
     for i, (g, (y, n)) in enumerate(densities.items()):
-        ax.stairs(y, bins, label=f"{g} ({n:,})", linewidth=1.7, color=f"C{i}")
+        h_g = hists[g][0]
+        ax.stairs(h_g / h_g.sum() * n if h_g.sum() else h_g, bins, label=f"{g} ({n:,})", linewidth=1.7, color=f"C{i}")
         if g == reference:
             continue
         yr = densities[reference][0]
@@ -897,30 +1048,30 @@ def draw_all(hists, bins, title, heading, out):
         if finite.size:
             spread = max(spread, float(np.max(np.abs(finite - 1))))
         rax.errorbar(centres + 0.0, ratio, xerr=width / 2, fmt="o", color=f"C{i}", markersize=3, linestyle="none", elinewidth=1)
-    half = min(max(1.2 * spread, 0.02), 0.5)
-    rax.set_ylim(1 - half, 1 + half)
-    ax.set_ylabel("unit-normalised density")
+    ratio_axis(rax, spread)
+    ax.set_ylabel("events / bin" if heading.endswith("unweighted") else "weighted events / bin")
     ax.set_title(heading, fontsize=10)
     ax.legend()
-    rax.set_ylabel(f"group / {reference}")
+    rax.set_ylabel(f"group / {reference}\n(shapes)")
     rax.set_xlabel(title)
     fig.savefig(out.with_suffix(".png"), dpi=130, bbox_inches="tight")
     fig.savefig(out.with_suffix(".pdf"), bbox_inches="tight")
     plt.close(fig)
 
 
-def compare_all_groups(sample, output, cache_dir, regions, channels, groups):
+def compare_all_groups(sample, output, cache_dir, regions, channels, groups, folder_name="ALL_GROUPS"):
     """Every group that provides the sample on one plot per variable, region, channel and weight mode."""
     present = [g for g in groups if sample in treat(g).files]
     if len(present) < 2:
         return None
     extracts = {g: extract(g, sample, cache_dir) for g in present}
-    root = output / "ALL_GROUPS" / sample
+    root = output / folder_name / sample
     root.mkdir(parents=True, exist_ok=True)
     info = {"sample": sample, "groups": present, "cells": {}}
-    out = [f"# All groups together: {sample}", "",
-           f"Groups: {', '.join(present)}. Every plot overlays the unit-normalised distribution of each group; the ratio panel is to **{present[0]}**. "
-           "Every group uses its own definition of the channel and of the corrected mass (see the pair reports for the details).", ""]
+    out = [f"# {'All groups together' if folder_name == 'ALL_GROUPS' else folder_name.replace('_VS_OTHERS', ' against all the other groups')}: {sample}", "",
+           f"Groups: {', '.join(present)}. Every plot overlays the events per bin of each group (MC: A.U., weighted shape scaled to the selected events); the ratio panel compares the unit-normalised shapes and is to **{present[0]}**. "
+           "Every group uses its own definition of the channel and of the corrected mass (see the pair reports for the details). "
+           "The plots in `<mode>/` have the ratio panel to the first group; `<mode>/ratio_to_<GROUP>/` has the same plots with the ratio to each other group.", ""]
     for region in regions:
         for channel in channels:
             selections = {g: selection(e, region, channel) for g, e in extracts.items()}
@@ -954,6 +1105,14 @@ def compare_all_groups(sample, output, cache_dir, regions, channels, groups):
                     d = {g: distance(hists[reference][0], h) for g, (h, _) in hists.items() if g != reference}
                     table.append((v.name, reference, d))
                     draw_all(hists, v.bins, v.title, f"{sample} - {region} - {channel} - {mode}", folder / v.name)
+                    # the same plot with the ratio panel to each of the other groups
+                    for other in hists:
+                        if other == reference:
+                            continue
+                        sub = folder / f"ratio_to_{other}"
+                        sub.mkdir(exist_ok=True)
+                        ordered = {other: hists[other], **{g: h for g, h in hists.items() if g != other}}
+                        draw_all(ordered, v.bins, v.title, f"{sample} - {region} - {channel} - {mode}", sub / v.name)
                 row["distances"][mode] = {name: d for name, _, d in table}
                 if mode == ("unweighted" if sample == "Data_Run2024H" else "genWeights") and table:
                     others = [g for g in present if g != present[0]]
@@ -978,6 +1137,8 @@ def main():
     p.add_argument("--channel", action="append", choices=CHANNELS)
     p.add_argument("--resume", action="store_true", help="keep pair/sample directories that already have a summary.json")
     p.add_argument("--summaries-only", action="store_true", help="rewrite the pair summaries and the root index from the existing summary.json files")
+    p.add_argument("--reference", choices=TREATERS, help="one group against all the others: only the overlay plots, with the ratio panels "
+                   "to this group, written in <OUTPUT>/<REFERENCE>_VS_OTHERS/ (no pairwise comparison)")
     p.add_argument("--no-overlay", action="store_true", help="skip the all-groups overlay plots")
     p.add_argument("--list", action="store_true", help="list the groups, samples and pairs and exit")
     a = p.parse_args()
@@ -986,6 +1147,16 @@ def main():
     if a.group1 and a.group1 == a.group2:
         p.error("--group1 and --group2 must differ")
     groups = list(TREATERS)
+    if a.reference:
+        if not a.output:
+            p.error("--output is required")
+        a.output.mkdir(parents=True, exist_ok=True)
+        ordered = [a.reference] + [g for g in groups if g != a.reference]
+        for s in sorted({s for g in groups for s in treat(g).files if not a.sample or s in a.sample}):
+            print(f"[reference {a.reference}] {s}", flush=True)
+            compare_all_groups(s, a.output, a.cache_dir, a.region or list(REGIONS), a.channel or list(CHANNELS), ordered,
+                               f"{a.reference}_VS_OTHERS")
+        return
     pairs = [(a.group1, a.group2)] if a.group1 else [(x, y) for i, x in enumerate(groups) for y in groups[i + 1:]]
     work = [(x, y, s) for x, y in pairs for s in sorted(set(treat(x).files) & set(treat(y).files)) if not a.sample or s in a.sample]
     if a.list:
