@@ -467,7 +467,7 @@ def apply_update_variant(spec):
         spec.mass = "m_mumu_nano"
         spec.notes.append(f"Tuple of `{UPDATE}`; regions and m_mumu on the raw (NanoAOD) dimuon mass `m_mumu_nano`.")
     elif group == "Marmara":
-        spec.files = {"Data_Run2024H": f"Marmara/{UPDATE}/tree_DATA_2024_loose_round2_update_last.root", "ggH": f"Marmara/{UPDATE}/tree_GGH_2024_loose_round2_upd2_nobtag_weight.root", "VBFH": f"Marmara/{UPDATE}/tree_VBF_2024_loose_round2_upd2_nobtag_weight.root"}
+        spec.files = {"Data_Run2024H": f"Marmara/{UPDATE}/tree_DATA_2024_loose_round2.root", "ggH": f"Marmara/{UPDATE}/tree_GGH_2024_loose_round2_upd2_nobtag_weight.root", "VBFH": f"Marmara/{UPDATE}/tree_VBF_2024_loose_round2_upd2_nobtag_weight.root"}
         spec.mass = "mm_mass_raw"
         # `w_total` includes the b-tag SF (it is exactly the product of its factors): the b-tag weight is left out here
         spec.weights = {"genWeights": "w_gen", "all_common_weights": "w_gen*w_norm*w_pu*w_muID_tot"}
