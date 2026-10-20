@@ -9,7 +9,7 @@ Two steps (full instructions in HOWTO.txt):
        yields_<sample>.csv   events and sum of weights per group, mass region and channel
        overlap_<sample>.csv  events present in both groups of every pair (matched on run, lumi, event)
        mass_<sample>.csv     m(mumu) distribution of every group (selected ggH or VBF events, 70-150 GeV)
-  2. plots  : draw bar charts of the yields, the ratio to a reference group, and the overlap matrices (common events / events of the row group) from those tables.
+  2. plots  : draw bar charts of the yields, the ratio to every group (or to --reference), and the overlap matrices (common events / events of the row group) from those tables.
 
   python3 sync_compare.py yields --round after_15Oct --base /eos/cms/store/group/phys_higgs/cmshmm/run3_sync --outdir out
   python3 sync_compare.py plots  --round after_15Oct --outdir out --reference TAMU
@@ -172,6 +172,16 @@ ROUNDS = {
                       'ggH': '(passLumiJSON & passTrigger & passPV & passMETFilters & passTriggerMatch & passRawPreselection & '
                              'passMuonSelection & passThirdLeptonVeto & passBTagVeto) & (passAnalysisSelection==0)'},
          'weights': {'gen': 'genWeight', 'all': 'weightBaseNoNorm'}},
+ 'MIT': {'tree': 'events', 'lumi': 'luminosityBlock',
+            # no raw-mass branch: built from the raw muon pT (as in the earlier round); the tuple has no jet or b-tag branches,
+            # so only the inclusive channel (every event of the file: ggH+VBF selection with relaxed b-veto) exists
+            'mass': 'sqrt(2*Muon1_rawpt*Muon2_rawpt*(cosh(Muon1_eta-Muon2_eta)-cos(Muon1_phi-Muon2_phi)))',
+            'files': {'Data_Run2024H': ['MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_-51_2024_ggHcat_synch.root',
+                                        'MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_-52_2024_ggHcat_synch.root'],
+                      'ggH': ['MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_11_2024_ggHcat_synch.root'],
+                      'VBFH': ['MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_10_2024_ggHcat_synch.root']},
+            'channels': {'inclusive': 'Muon1_pt > 0'},
+            'weights': {'gen': 'w', 'all': 'w_allSF'}},
  'Iowa': {'tree': 'SyncEvents',
           'lumi': 'luminosityBlock',
           'mass': 'massRaw',
@@ -190,11 +200,17 @@ GROUPS = ROUNDS[ROUND]
 
 SAMPLES = ["Data_Run2024H", "ggH", "VBFH"]            # default
 ALL_SAMPLES = SAMPLES + ["ttH", "ZH", "WplusH"]       # available for some groups (--samples)
-CHANNELS = ["ggH", "VBF"]
+CHANNELS = ["ggH", "VBF", "inclusive"]    # inclusive = ggH or VBF (a group that only has an inclusive selection defines it directly)
 # mass regions on the group's raw dimuon mass; the data are blinded in the signal window
 REGIONS = {"Z_sideband": (70, 110), "H_sideband": None, "Signal_Fit": (115, 135)}
 H_SIDEBAND = ((110, 115), (135, 150))
 MASS_RANGE = (70, 150)
+
+
+def defined(group, channel):
+    """Whether a group provides a channel (inclusive exists whenever ggH and VBF exist)."""
+    channels = GROUPS[group]["channels"]
+    return channel in channels or (channel == "inclusive" and "ggH" in channels and "VBF" in channels)
 
 
 def in_region(mass, region):
@@ -252,7 +268,7 @@ def read_sample(base, spec, sample, step_size=500_000):
     wanted = ["run", spec["lumi"], "event"]
     for expression in expressions:
         wanted += branch_names(expression)
-    out = {k: [] for k in ("key", "mass", "ggH", "VBF", "w_gen", "w_all")}
+    out = {k: [] for k in ("key", "mass", "ggH", "VBF", "inclusive", "w_gen", "w_all")}
     entries = 0
     for path in sample_files(base, spec, sample):
         tree = uproot.open(path)[spec["tree"]]
@@ -261,8 +277,12 @@ def read_sample(base, spec, sample, step_size=500_000):
             entries += len(chunk)
             mass = evaluate(chunk, spec["mass"]).astype(np.float64)
             keep = (mass > MASS_RANGE[0]) & (mass < MASS_RANGE[1])
-            channel = {c: evaluate(chunk, spec["channels"][c]).astype(bool) for c in CHANNELS}
-            keep &= channel["ggH"] | channel["VBF"]
+            channel = {c: evaluate(chunk, spec["channels"][c]).astype(bool) for c in CHANNELS if c in spec["channels"]}
+            for c in CHANNELS:
+                channel.setdefault(c, np.zeros(len(chunk), bool))
+            if "inclusive" not in spec["channels"]:
+                channel["inclusive"] = channel["ggH"] | channel["VBF"]
+            keep &= channel["inclusive"]
             out["key"].append(pack_keys(chunk["run"], chunk[spec["lumi"]], chunk["event"], is_data)[keep])
             out["mass"].append(mass[keep])
             for c in CHANNELS:
@@ -279,7 +299,10 @@ def load_or_read(base, group, sample, outdir):
     """Read the ntuple once; the selected events are cached in <outdir>/cache/<group>_<sample>.npz."""
     cache = Path(outdir) / "cache" / ROUND / f"{group}_{sample}.npz"
     if cache.exists():
-        return dict(np.load(cache))
+        d = dict(np.load(cache))
+        if "inclusive" not in d:          # caches written before the inclusive channel existed
+            d["inclusive"] = d["ggH"] | d["VBF"]
+        return d
     print(f"[read] {ROUND} {group} {sample}", flush=True)
     result = read_sample(base, GROUPS[group], sample)
     cache.parent.mkdir(parents=True, exist_ok=True)
@@ -314,6 +337,11 @@ def cells(sample):
     return [(r, c) for r in REGIONS for c in CHANNELS if not (sample.startswith("Data") and r == "Signal_Fit")]
 
 
+def number_of(rows, group, region, channel):
+    """Events of a cell, None when the group does not provide the channel."""
+    return next((int(r["events"]) for r in rows if (r["group"], r["region"], r["channel"]) == (group, region, channel)), None)
+
+
 def step_yields(args):
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -323,9 +351,13 @@ def step_yields(args):
         yields, overlap, mass_rows = [], [], []
         for g, d in data.items():
             for region, channel in cells(sample):
+                if not defined(g, channel):
+                    continue
                 sel = d[channel] & in_region(d["mass"], region)
                 yields.append([g, sample, region, channel, int(sel.sum()), f"{d['w_gen'][sel].sum():.6g}", f"{d['w_all'][sel].sum():.6g}", int(d["duplicates"])])
             for channel in CHANNELS:
+                if not defined(g, channel):
+                    continue
                 sel = d[channel]
                 counts, edges = np.histogram(d["mass"][sel], bins=np.arange(MASS_RANGE[0], MASS_RANGE[1] + 1, 1.0))
                 mass_rows += [[g, channel, edges[i], edges[i + 1], int(counts[i])] for i in range(len(counts))]
@@ -333,6 +365,8 @@ def step_yields(args):
         for i, a in enumerate(names):
             for b in names[i + 1:]:
                 for region, channel in cells(sample):
+                    if not (defined(a, channel) and defined(b, channel)):
+                        continue
                     ka = np.unique(data[a]["key"][data[a][channel] & in_region(data[a]["mass"], region)])
                     kb = np.unique(data[b]["key"][data[b][channel] & in_region(data[b]["mass"], region)])
                     common = len(np.intersect1d(ka, kb, assume_unique=True))
@@ -364,7 +398,7 @@ def plot_bars(outdir, sample, rows):
     fig, ax = plt.subplots(figsize=(11, 5))
     width = 0.8 / len(groups)
     for i, g in enumerate(groups):
-        y = [next(int(r["events"]) for r in rows if (r["group"], r["region"], r["channel"]) == (g, reg, ch)) for reg, ch in cells(sample)]
+        y = [number_of(rows, g, reg, ch) or 0 for reg, ch in cells(sample)]
         ax.bar(np.arange(len(labels)) + (i - (len(groups) - 1) / 2) * width, y, width, label=g, color=colour[g])
     ax.set_xticks(np.arange(len(labels)))
     ax.set_xticklabels(labels, fontsize=8)
@@ -382,15 +416,15 @@ def plot_ratio(outdir, sample, rows, reference):
     if reference not in {r["group"] for r in rows}:
         return
     labels = [f"{r}\n{c}" for r, c in cells(sample)]
-    colour = colours([reference] + groups)
-    fig, ax = plt.subplots(figsize=(11, 5))
+    colour = colours(list(dict.fromkeys(r["group"] for r in rows)))
+    fig, ax = plt.subplots(figsize=(13, 5))
     ax.axhspan(0.99, 1.01, color="0.85", label="±1%")
     ax.axhspan(0.95, 1.05, color="0.93", zorder=0, label="±5%")
     for i, g in enumerate(groups):
         ratios = []
         for reg, ch in cells(sample):
-            number = {r["group"]: int(r["events"]) for r in rows if (r["region"], r["channel"]) == (reg, ch)}
-            ratios.append(number[g] / number[reference] if number.get(reference) else np.nan)
+            n_g, n_ref = number_of(rows, g, reg, ch), number_of(rows, reference, reg, ch)
+            ratios.append(n_g / n_ref if n_g is not None and n_ref else np.nan)
         x = np.arange(len(labels)) + (i - (len(groups) - 1) / 2) * 0.12
         ax.plot(x, ratios, "o", color=colour[g], label=g)
     ax.axhline(1, color="k", lw=0.8)
@@ -401,10 +435,10 @@ def plot_ratio(outdir, sample, rows, reference):
     ax.set_yticks([0.1, 0.2, 0.5, 0.8, 0.9, 1, 1.1, 1.25, 2, 3])
     ax.set_yticklabels(["0.1", "0.2", "0.5", "0.8", "0.9", "1", "1.1", "1.25", "2", "3"])
     ax.set_ylabel(f"events / {reference}")
-    ax.set_title(f"{sample}: yield agreement with {reference}")
+    ax.set_title(f"{sample}: yield agreement with {reference} (missing points: channel not provided)")
     ax.legend(ncol=len(groups) + 2, fontsize=8)
     fig.tight_layout()
-    fig.savefig(outdir / f"yield_ratio_{sample}.png", dpi=130)
+    fig.savefig(outdir / f"yield_ratio_{sample}_vs_{reference}.png", dpi=130)
     plt.close(fig)
 
 
@@ -470,7 +504,9 @@ def step_plots(args):
         if (outdir / f"yields_{sample}.csv").exists():
             rows = read_csv(outdir / f"yields_{sample}.csv")
             plot_bars(outdir, sample, rows)
-            plot_ratio(outdir, sample, rows, args.reference)
+            groups = list(dict.fromkeys(r["group"] for r in rows))
+            for reference in (groups if args.reference == "all" else [args.reference]):
+                plot_ratio(outdir, sample, rows, reference)
             plot_overlap(outdir, sample, read_csv(outdir / f"overlap_{sample}.csv"))
             plot_mass(outdir, sample, read_csv(outdir / f"mass_{sample}.csv"))
             print(f"[plots] {sample}", flush=True)
@@ -494,7 +530,7 @@ def step_markdown(args):
         lines += [f"## {sample}: selected events per region and channel\n"]
         cell_list = list(dict.fromkeys((r["region"], r["channel"]) for r in rows))
         lines += md_table(["region / channel"] + groups,
-                          [[f"{reg} / {ch}"] + [f"{int(next(r['events'] for r in rows if (r['group'], r['region'], r['channel']) == (g, reg, ch))):,}" for g in groups]
+                          [[f"{reg} / {ch}"] + [("n/a" if number_of(rows, g, reg, ch) is None else f"{number_of(rows, g, reg, ch):,}") for g in groups]
                            for reg, ch in cell_list])
         lines += ["Duplicate rows dropped: " + ", ".join(f"{g} {int(next(r['duplicate_rows_dropped'] for r in rows if r['group'] == g)):,}" for g in groups) + "\n"]
         overlap = read_csv(outdir / f"overlap_{sample}.csv")
@@ -530,7 +566,7 @@ def main():
         if name == "yields":
             p.add_argument("--base", default="/eos/cms/store/group/phys_higgs/cmshmm/run3_sync", help="directory with one folder per group")
         elif name == "plots":
-            p.add_argument("--reference", default="TAMU", help="group the yield ratios are computed against")
+            p.add_argument("--reference", default="all", help="group the yield ratios are computed against (default: one plot per group)")
     args = parser.parse_args()
     ROUND, GROUPS = args.round, ROUNDS[args.round]
     args.outdir = args.outdir or f"sync_out_{ROUND}"

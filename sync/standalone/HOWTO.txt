@@ -3,7 +3,8 @@ HOW TO RECREATE THE YIELD TABLES AND PLOTS OF THE RUN 3 H->MUMU SYNCHRONISATION
 2024 data (Run2024H) and ggH / VBFH signal (ttH, ZH, WplusH where published). Two rounds of ntuples are covered:
   before_15Oct  tuples published 12-15 Oct 2026 directly in the group folders: TAMU, Pisa, Marmara, PKU, Purdue, MIT, NNU, Caltech
                 (corrected dimuon mass; Caltech: its first small skim of 15 Oct)
-  after_15Oct   tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass): TAMU, Pisa, Marmara, Caltech, NNU, Iowa
+  after_15Oct   tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass): TAMU, Pisa, Marmara, Caltech, NNU, Iowa, MIT
+                (MIT: path MIT/VBF-GGH/update_after_Hmm_15Oct, inclusive channel only)
 Choose the round with --round (default after_15Oct). Every command below accepts it.
 
 Everything is done by ONE file, sync_compare.py. It needs no analysis framework and no CMSSW.
@@ -33,7 +34,8 @@ The dictionary ROUNDS at the top of sync_compare.py says, for each round and gro
   lumi     name of the luminosity-block branch (run and event are always called "run" and "event")
   mass     branch with the dimuon mass used to define the regions: the corrected (FSR/scale) mass in before_15Oct,
            the RAW uncorrected mass in after_15Oct. The data are blinded in 115-135 GeV on this mass
-  channels one boolean expression for ggH and one for VBF (what the group calls its ggH / VBF event)
+  channels one boolean expression for ggH and one for VBF (what the group calls its ggH / VBF event); the channel 'inclusive'
+           (ggH or VBF) is built automatically, or given directly for a group that only has an inclusive selection (MIT)
   weights  gen = generator weight only, all = generator * pileup * muon ID/iso * trigger (no b-tag SF, no lumi/xs factor)
 
 Channel definitions used in after_15Oct (our reading of every tuple, to be confirmed by the owners; the before_15Oct ones are in ROUNDS):
@@ -42,6 +44,8 @@ Channel definitions used in after_15Oct (our reading of every tuple, to be confi
   Marmara  sel_full & cat_isGGH[:,0] / sel_full & cat_isVBF[:,0]
   Caltech  is_ggH_category / is_VBF_category with event_pass_muon_trigger_match and event_pass_jet_veto
   NNU      VBF = passAnalysisSelection; ggH = baseline of NNU's ntuple_info without the jet selection and not VBF. No ggH sample.
+  MIT      only an inclusive selection (every event of the file: ggH+VBF selection with relaxed b-veto); the tuple has no jet/b-tag
+           branches. Mass = built from Muon*_rawpt, eta, phi. ggH/VBF channels are not available (shown as n/a / missing points)
   Iowa     VBF = baseline flags & passVBFCategoryApprox; ggH = baseline flags & not passVBFCategoryApprox. No ggH sample.
 
 Regions (on the raw mass):
@@ -75,11 +79,12 @@ How the numbers are defined:
 
 4. STEP 2: PLOTS
 ----------------
-    python3 sync_compare.py plots --round after_15Oct --outdir out_after --reference TAMU
+    python3 sync_compare.py plots --round after_15Oct --outdir out_after            # ratios to every group
+    python3 sync_compare.py plots --round after_15Oct --outdir out_after --reference TAMU   # ratios to TAMU only
 
 Written in out/ for every sample:
   yield_bars_<sample>.png    bar chart of the selected events per mass region and channel, one bar per group (log scale)
-  yield_ratio_<sample>.png   events of every group divided by the reference group, with +-1% and +-5% bands
+  yield_ratio_<sample>_vs_<group>.png   events of every group divided by <group> (one plot per group, or only --reference), with +-1% and +-5% bands
   overlap_matrix_<sample>.png  matrix (ggH and VBF): entry (row A, column B) = common events / events of the row group A, in %
                              (the fraction of A's selected events that B also has; the matrix is not symmetric)
   mass_<sample>.png          raw dimuon-mass distribution of every group

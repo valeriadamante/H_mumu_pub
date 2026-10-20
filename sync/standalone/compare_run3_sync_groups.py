@@ -557,6 +557,7 @@ def first_element(array, index):
 
 def byrank(array, mask, key, rank):
     """The rank-th entry (0 = largest `key`) of `array` among the entries where `mask` is true; for branches that are not pT-ordered."""
+    array, mask, key = (ak.from_regular(x, axis=1) for x in (array, mask, key))   # fixed-size lists would be flattened by the mask
     mask = ak.values_astype(mask, bool)
     return first_element(array[mask][ak.argsort(key[mask], axis=1, ascending=False)], rank)
 
@@ -1021,7 +1022,7 @@ def write_root_summary(output):
             "Raw tuple counts are not yields: the groups use different loose preselections.  Selected events are therefore always "
             "counted per region and channel, and events absent from one tuple are separated from events present but classified differently.", "",
             "| pair | sample | unique events A | unique events B | common | common / A | common / B |", "|---|---|---:|---:|---:|---:|---:|", *rows, "",
-            "Regenerate with `sync/standalone/compare_run3_sync_groups.py`; `--group1/--group2` restrict the pair and a new group is added with a `treat_<group>_ntuple` function.", ""]
+            "Regenerate with `sync/python/compare_run3_sync_groups.py`; `--group1/--group2` restrict the pair and a new group is added with a `treat_<group>_ntuple` function.", ""]
     (output / "SUMMARY.md").write_text("\n".join(text))
 
 
