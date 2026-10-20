@@ -10,9 +10,13 @@ Layout of the output:
 
     <output>/<GROUP1>-<GROUP2>/<sample>/<region>/<channel>/SUMMARY.md + plots
 
-  python3 sync/python/compare_run3_sync_groups.py --output $HMUMU_WWW/skim_v4/studies/sync/groups_comparison_13Oct
-  python3 sync/python/compare_run3_sync_groups.py --group1 TAMU --group2 PKU --sample Data_Run2024H ...
-  python3 sync/python/compare_run3_sync_groups.py --list
+  export HMUMU_SYNC_VARIANT=update_after_Hmm_15Oct     # the tuples published after the Hmm meeting of 15 Oct 2026
+  python3 compare_run3_sync_groups.py --group1 TAMU --group2 Pisa --output pairs --cache-dir cache --no-overlay
+  python3 compare_run3_sync_groups.py --group1 TAMU --group2 Iowa --sample Data_Run2024H --output pairs
+  python3 compare_run3_sync_groups.py --list
+
+Requires numpy, awkward>=2, uproot>=5, matplotlib. HMUMU_SYNC_BASE sets the folder with one sub-folder per group.
+For yield tables and bar charts only, use the simpler sync_compare.py.
 """
 from __future__ import annotations
 
@@ -79,7 +83,42 @@ class Variable:
 
 def V(name, title, bins, TAMU=None, Marmara=None, PKU=None, NNU=None, min_jets=0, Pisa=None):
     return Variable(name, title, np.asarray(bins), {"TAMU": TAMU, "Marmara": Marmara, "PKU": PKU, "NNU": NNU, "Pisa": Pisa,
-                                                      "Purdue": PURDUE_EXPR.get(name), "MIT": MIT_EXPR.get(name)}, min_jets)
+                                                      "Purdue": PURDUE_EXPR.get(name), "MIT": MIT_EXPR.get(name),
+                                                      "Caltech": CALTECH_EXPR.get(name), "Iowa": IOWA_EXPR.get(name)}, min_jets)
+
+
+# Caltech branches (`update_after_Hmm_15Oct` only, raw-level): `*_bscPt`/`diMuon_bsc*` are the beam-spot-constrained values, `*_noCorr` the
+# uncorrected ones (the update variant compares the raw mass and pT); the jets are the two leading ones (`leading_jet_*`, `diJet_*`)
+CALTECH_EXPR = {
+    "m_mumu": "diMuon_bscMass_noCorr", "m_mumu_uncorrected": "diMuon_bscMass_noCorr", "pt_mumu": "diMuon_bscPt_noCorr",
+    "eta_mumu": "diMuon_eta", "phi_mumu": "diMuon_phi", "mu1_pt": "mu1_bscPt", "mu2_pt": "mu2_bscPt",
+    "mu1_pt_nano": "mu1_bscPt_noCorr", "mu2_pt_nano": "mu2_bscPt_noCorr", "mu1_eta": "mu1_eta", "mu2_eta": "mu2_eta",
+    "mu1_phi": "mu1_phi", "mu2_phi": "mu2_phi", "met_phi": "PuppiMET_phi", "njets": "n_jet",
+    "jet1_pt": "leading_jet_pt", "jet1_eta": "leading_jet_eta", "jet1_phi": "leading_jet_phi",
+    "jet2_pt": "subleading_jet_pt", "jet2_eta": "subleading_jet_eta", "jet2_phi": "subleading_jet_phi",
+    "mjj": "diJet_mass", "pt_jj": "diJet_pt", "eta_jj": "diJet_eta", "deta_jj": "abs(delta_eta_diJet)", "dphi_jj": "abs(delta_phi_diJet)",
+}
+
+
+# Iowa branches (`update_after_Hmm_15Oct`, tree `SyncEvents`, raw-level): the muon branches are two-entry arrays (the analysis pair, in storage order),
+# so leading/subleading are ranked by `muonRawPt`; the jets are the entries with `jetPassQuality` (the selected jets, `nSelectedJets` of them)
+_IOWA_MU = "muonRawPt>0"
+def _iowa_mu(branch, rank):
+    return f"byrank({branch}, {_IOWA_MU}, muonRawPt, {rank})"
+def _iowa_jet(branch, rank):
+    return f"byrank({branch}, jetPassQuality, jetCorrectedPt, {rank})"
+IOWA_EXPR = {
+    "m_mumu": "massRaw", "m_mumu_uncorrected": "massRaw", "pt_mumu": "ptRaw",
+    "mu1_pt": _iowa_mu("muonPostFSRPt", 0), "mu2_pt": _iowa_mu("muonPostFSRPt", 1),
+    "mu1_pt_nano": _iowa_mu("muonRawPt", 0), "mu2_pt_nano": _iowa_mu("muonRawPt", 1),
+    "mu1_eta": _iowa_mu("muonEta", 0), "mu2_eta": _iowa_mu("muonEta", 1),
+    "mu1_phi": _iowa_mu("muonPhi", 0), "mu2_phi": _iowa_mu("muonPhi", 1),
+    "met_pt": "metPt", "met_phi": "metPhi", "njets": "nSelectedJets", "n_bjets_loose": "nBJetsLoose", "n_bjets_medium": "nBJetsMedium",
+    "jet1_pt": _iowa_jet("jetCorrectedPt", 0), "jet2_pt": _iowa_jet("jetCorrectedPt", 1),
+    "jet1_eta": _iowa_jet("jetEta", 0), "jet2_eta": _iowa_jet("jetEta", 1),
+    "jet1_phi": _iowa_jet("jetPhi", 0), "jet2_phi": _iowa_jet("jetPhi", 1),
+    "mjj": "leadingDijetMass", "pt_jj": "leadingDijetPt", "deta_jj": "abs(leadingDijetDEta)",
+}
 
 
 # MIT branches (variable name -> expression); the jets are the VBF dijet (-1 when there is no dijet)
@@ -155,7 +194,7 @@ _set("mu1_pt_nano", MIT="Muon1_rawpt")
 _set("mu2_pt_nano", MIT="Muon2_rawpt")
 _set("m_mumu_uncorrected", MIT="sqrt(2*Muon1_rawpt*Muon2_rawpt*(cosh(Muon1_eta-Muon2_eta)-cos(Muon1_phi-Muon2_phi)))")
 
-_ALL = ("TAMU", "Marmara", "PKU", "NNU", "Pisa", "Purdue", "MIT")
+_ALL = ("TAMU", "Marmara", "PKU", "NNU", "Pisa", "Purdue", "MIT", "Caltech", "Iowa")
 
 
 def _derived(name, title, bins, build, min_jets=0, native=None):
@@ -175,13 +214,14 @@ _derived("pt_mumu_uncorrected", r"uncorrected $p_T^{\mu\mu}$ [GeV]", np.linspace
          lambda g: None if None in (_expr(g, "mu1_pt_nano"), _expr(g, "mu2_pt_nano"), _expr(g, "mu1_phi"), _expr(g, "mu2_phi")) else
          f"sqrt(({_expr(g, 'mu1_pt_nano')})**2+({_expr(g, 'mu2_pt_nano')})**2+2*({_expr(g, 'mu1_pt_nano')})*({_expr(g, 'mu2_pt_nano')})"
          f"*cos(({_expr(g, 'mu1_phi')})-({_expr(g, 'mu2_phi')})))",
-         native={"TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "NNU": "dimuon_raw_pt", "Pisa": "Dimuon_rawPt", "Purdue": "dimuon_pt_raw"})
+         native={"TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "NNU": "dimuon_raw_pt", "Pisa": "Dimuon_rawPt", "Purdue": "dimuon_pt_raw",
+                 "Caltech": "diMuon_bscPt_noCorr", "Iowa": "ptRaw"})
 _derived("mu1_charge", "leading $\mu$ charge", np.arange(-1.5, 2.5, 1), lambda g: None,
          native={"TAMU": "mu1_charge", "Marmara": "mu_charge[:,0]", "PKU": "mu1_fromH_charge", "NNU": "mu1_charge", "Pisa": "LeadingMuon_charge",
-                 "Purdue": "mu1_charge", "MIT": "Muon1_charge"})
+                 "Purdue": "mu1_charge", "MIT": "Muon1_charge", "Iowa": _iowa_mu("muonCharge", 0)})
 _derived("mu2_charge", "subleading $\mu$ charge", np.arange(-1.5, 2.5, 1), lambda g: None,
          native={"TAMU": "mu2_charge", "Marmara": "mu_charge[:,1]", "PKU": "mu2_fromH_charge", "NNU": "mu2_charge", "Pisa": "SubLeadingMuon_charge",
-                 "Purdue": "mu2_charge", "MIT": "Muon2_charge"})
+                 "Purdue": "mu2_charge", "MIT": "Muon2_charge", "Iowa": _iowa_mu("muonCharge", 1)})
 _derived("deta_mumu", r"$|\Delta\eta_{\mu\mu}|$", np.linspace(0, 5, 51), _pair(lambda a, b: f"abs({a}-{b})", "mu1_eta", "mu2_eta"))
 _derived("dphi_mumu", r"$|\Delta\phi_{\mu\mu}|$", np.linspace(0, math.pi, 33), _pair(lambda a, b: f"abs(dphi({a},{b}))", "mu1_phi", "mu2_phi"))
 _derived("dR_mumu", r"$\Delta R_{\mu\mu}$", np.linspace(0, 6, 61),
@@ -234,6 +274,51 @@ def treat_Marmara_ntuple():
          "Jets are the entries of the jet arrays with `jet_passAnalysis` (`nJetsAna` of them), ranked by `jet_pt` because the arrays are not pT-ordered (92% of events have the largest-pT jet first); `jj_*` is their leading pair. Which jet-energy corrections `jet_pt` carries (it differs from the other groups' corrected pT by a median of a few GeV) has to be confirmed with Marmara.",
          "Data: `tree_DATA_2024_loose_for_ALL_2024_H_Data_Samples.root` (4.5M events, full Run2024H, replaces the earlier partial `larger_stat` file); `data_Run2024H_Muon*.root` are NanoAOD inputs.",
          "The `GluGluH-...root` / `VBFH-...root` files are NanoAOD too; the `tree_*_loose_LAST.root` tuples are used."])
+
+
+def treat_Caltech_ntuple():
+    """Caltech exchange tuples (`Caltech/update_after_Hmm_15Oct/{ggH,VBF,Muon0_2024H,Muon1_2024H}_skim.root`, tree `tree_output`)."""
+    d = f"Caltech/{UPDATE}/"
+    return GroupSpec(
+        "Caltech", {"Data_Run2024H": [d + "Muon0_2024H_skim.root", d + "Muon1_2024H_skim.root"], "ggH": d + "ggH_skim.root", "VBFH": d + "VBF_skim.root"},
+        "tree_output", "luminosityBlock", "diMuon_bscMass_noCorr",
+        {"ggH": "(is_ggH_category == 1) & event_pass_muon_trigger_match & event_pass_jet_veto",
+         "VBF": "(is_VBF_category == 1) & event_pass_muon_trigger_match & event_pass_jet_veto"},
+        {"genWeights": "gen_weight", "all_common_weights": "gen_weight*pileup_weight*mu_trig_eff_SF*mu_ID_eff_SF*mu_ISO_eff_SF"},
+        ["event_pass_muon_trigger_match", "event_pass_jet_veto", "is_ggH_category", "is_VBF_category"],
+        [f"Tuple of `{UPDATE}` (raw-level): regions and m_mumu on `diMuon_bscMass_noCorr`, pT on `diMuon_bscPt_noCorr`, muon pT corrected = `mu*_bscPt`, "
+         "NanoAOD-like = `mu*_bscPt_noCorr`; jets are `leading_jet_*`/`subleading_jet_*`/`diJet_*`.",
+         "Channels: `is_ggH_category`/`is_VBF_category` (mutually exclusive) together with `event_pass_muon_trigger_match` and `event_pass_jet_veto`; "
+         "this definition of the baseline is our assumption and has to be confirmed by Caltech. There is no b-tag flag/count in the tuple, no MET pT and no charge.",
+         "Data have `gen_weight=-999` (unused); no events in the 115-135 GeV window, i.e. blinded."])
+
+
+def iowa_files():
+    """Iowa publishes per-job files: data = Muon0 + Muon1, VBFH = VBF (no ggH sample)."""
+    d = BASE / "Iowa" / UPDATE
+    rel = lambda sub: sorted(str(p.relative_to(BASE)) for p in (d / sub).glob("*.root"))
+    return {"Data_Run2024H": rel("Muon0") + rel("Muon1"), "VBFH": rel("VBF")}
+
+
+def treat_Iowa_ntuple():
+    """Iowa exchange tuples (`Iowa/update_after_Hmm_15Oct/{Muon0,Muon1,VBF}/*_sync_round2.root`, tree `SyncEvents`)."""
+    base = ("passGolden & passFilters & passHLTAndObjectMatch & passAnalysisMuonSelection & passExactlyTwoAnalysisMuons & passElectronVeto & "
+            "passAdditionalLeptonVeto & passJetVetoMap & passBJetVeto & passVertex & analysisPairPassesRawWindow & oppositeSign")
+    return GroupSpec(
+        "Iowa", iowa_files() if (BASE / "Iowa" / UPDATE).exists() else {},
+        "SyncEvents", "luminosityBlock", "massRaw",
+        {"ggH": f"{base} & ~passVBFCategoryApprox", "VBF": f"{base} & passVBFCategoryApprox"},
+        {"genWeights": "weightGenerator", "all_common_weights": "weightGenerator*weightPileup*weightMuonIDISO*weightTrigger"},
+        ["passGolden", "passFilters", "passHLTAndObjectMatch", "passAnalysisMuonSelection", "passExactlyTwoAnalysisMuons", "passElectronVeto",
+         "passAdditionalLeptonVeto", "passJetVetoMap", "passBJetVeto", "passVertex", "passVBFCategoryApprox"],
+        [f"Tuple of `{UPDATE}` (raw-level): regions and m_mumu on `massRaw`, pT on `ptRaw`; muon pT corrected = `muonPostFSRPt`, NanoAOD-like = `muonRawPt` "
+         "(not confirmed that this is the NanoAOD pT; `muonBasePt` is also stored).",
+         "Baseline = the stored pass flags (golden, filters, HLT + object match, analysis muon pair, exactly two analysis muons, electron/additional-lepton veto, "
+         "jet veto map, b-veto, vertex, raw mass window, OS); VBF = baseline and `passVBFCategoryApprox`; ggH = baseline and not VBF. "
+         "Both are our reading of the tuple and have to be confirmed by Iowa. There is no ggH sample.",
+         "The muon arrays are in storage order; leading/subleading are ranked by `muonRawPt`. Jets are the entries with `jetPassQuality` ranked by "
+         "`jetCorrectedPt`; `leadingDijet*` is the leading pair. No dijet phi/eta and no soft activity.",
+         "Data blinding is on the raw mass (`massRaw`); ~20 events per file have the post-FSR mass in 115-135 GeV."])
 
 
 def treat_PKU_ntuple():
@@ -335,7 +420,7 @@ def treat_MIT_ntuple():
 
 
 TREATERS = {"TAMU": treat_TAMU_ntuple, "Marmara": treat_Marmara_ntuple,
-            "PKU": treat_PKU_ntuple, "NNU": treat_NNU_ntuple, "Pisa": treat_Pisa_ntuple, "Purdue": treat_Purdue_ntuple, "MIT": treat_MIT_ntuple}
+            "PKU": treat_PKU_ntuple, "NNU": treat_NNU_ntuple, "Pisa": treat_Pisa_ntuple, "Purdue": treat_Purdue_ntuple, "MIT": treat_MIT_ntuple, "Caltech": treat_Caltech_ntuple, "Iowa": treat_Iowa_ntuple}
 
 
 LEADING_PT_MIN = 30      # both leading jets, as in Pisa's VBF selection
@@ -366,9 +451,85 @@ def add_leading_channels(spec):
     spec.channels["ggH_noVBF_onlyLeading"] = f"{base} & ~({vbf})"
 
 
+# Update after the Hmm meeting of 15 Oct 2026: TAMU, Marmara and Pisa published new tuples in `<group>/update_after_Hmm_15Oct/`
+# (HMUMU_SYNC_VARIANT=update_after_Hmm_15Oct).  They are raw-level: the mass regions and m_mumu use the uncorrected (NanoAOD) dimuon mass,
+# which is the only mass Pisa stores.  Pisa lost the corrected mass/pT, the MET and Dijet_eta, so those variables are not compared.
+VARIANT = os.environ.get("HMUMU_SYNC_VARIANT", "")
+UPDATE = "update_after_Hmm_15Oct"
+
+
+def apply_update_variant(spec):
+    group = spec.name
+    if group == "TAMU":
+        spec.files = {s: f.replace("TAMU/", f"TAMU/{UPDATE}/") for s, f in spec.files.items()}
+        # VBFH: the main production and its _ext1 extension (Pisa's file contains both)
+        spec.files["VBFH"] = [spec.files["VBFH"], spec.files["VBFH"].replace(".root", "_ext1.root")]
+        spec.mass = "m_mumu_nano"
+        spec.notes.append(f"Tuple of `{UPDATE}`; regions and m_mumu on the raw (NanoAOD) dimuon mass `m_mumu_nano`.")
+    elif group == "Marmara":
+        spec.files = {"Data_Run2024H": f"Marmara/{UPDATE}/tree_DATA_2024_loose_round2_update_last.root", "ggH": f"Marmara/{UPDATE}/tree_GGH_2024_loose_round2_upd2_nobtag_weight.root", "VBFH": f"Marmara/{UPDATE}/tree_VBF_2024_loose_round2_upd2_nobtag_weight.root"}
+        spec.mass = "mm_mass_raw"
+        # `w_total` includes the b-tag SF (it is exactly the product of its factors): the b-tag weight is left out here
+        spec.weights = {"genWeights": "w_gen", "all_common_weights": "w_gen*w_norm*w_pu*w_muID_tot"}
+        spec.notes.append(f"Tuples of `{UPDATE}` (Data_Run2024H, ggH and VBFH); regions and m_mumu on `mm_mass_raw`.")
+    elif group == "NNU":
+        d = f"NNU/{UPDATE}/"
+        spec.files = {"Data_Run2024H": d + "NNU-dataH2024.root", "VBFH": d + "NNU-VBFH-Hto2Mu_M125_RunIII2024Summer24_20261020.root"}
+        spec.mass = "dimuon_raw_mass"
+        base = ("passLumiJSON & passTrigger & passPV & passMETFilters & passTriggerMatch & passRawPreselection & passMuonSelection & "
+                "passThirdLeptonVeto & passBTagVeto")
+        # passJetSelection requires >= 2 jets, so it is left out of the ggH baseline (as stated in NNU's ntuple_info)
+        spec.channels = {"VBF": "passAnalysisSelection", "ggH": f"({base}) & (passAnalysisSelection==0)"}
+        spec.weights = {"genWeights": "genWeight", "all_common_weights": "weightBaseNoNorm"}
+        spec.flags = ["passLumiJSON", "passTrigger", "passPV", "passMETFilters", "passTriggerMatch", "passRawPreselection", "passMuonSelection",
+                      "passThirdLeptonVeto", "passJetSelection", "passBTagVeto", "passVBFKinematics", "passAnalysisSelection"]
+        spec.notes = [f"Tuple of `{UPDATE}` (20 Oct): raw-level, regions and m_mumu on `dimuon_raw_mass`, pT on `dimuon_raw_pt`. VBF = `passAnalysisSelection`; "
+                      "ggH = the baseline of the ntuple_info without the jet selection (>= 2 jets) and not `passAnalysisSelection`; this is our reading and "
+                      "has to be confirmed by NNU. There is no ggH sample. Data are blinded on the raw mass; NNU asks to also exclude 115-135 on `dimuon_fsr_mass`, "
+                      "which is not needed here because the regions use the raw mass."]
+    elif group == "Pisa":
+        d = f"PISA/{UPDATE}/"
+        spec.files = {"Data_Run2024H": [d + "PISA-Muon0_Run2024H-MINIv6NANOv15-v1/Events.root", d + "PISA-Muon1_Run2024H-MINIv6NANOv15-v2/Events.root"],
+                      "ggH": d + "PISA-GluGluH-Hto2Mu_Par-M-125_2024Summer24NanoAODv15/Events.root",
+                      "VBFH": d + "PISA-VBFH-Hto2Mu_Par-M-125_2024Summer24NanoAODv15/Events.root"}
+        spec.mass = "Dimuon_rawMass"
+        # the pass_* flags are cumulative; `first_failed_step` is shifted by one in data (extra BlindingSR step), so the flags are used
+        spec.channels = {"VBF": "pass_BJetVeto",
+                         "ggH": "pass_EleVeto & ~pass_DijetDeltaEta & (nMediumBTagJet == 0) & (nLooseBTagJet < 2)"}
+        spec.weights = {"genWeights": "Generator_weight", "all_common_weights": "Generator_weight*PuSF*MuIdSF*MuIsoSF*MuTrgSF"}
+        spec.flags = ["pass_BASESELECTION", "pass_NoiseFilters", "pass_GoldenJson", "pass_GoodPV", "pass_isTriggered", "pass_AtLeastOneTrgMuon",
+                      "pass_TwoMuons", "pass_TwoOppositeSignMuons", "pass_RawDimuonMassWindow", "pass_LeadingMuonCut", "pass_EleVeto",
+                      "pass_TwoJets", "pass_LeadingJetPt", "pass_DijetMass", "pass_DijetDeltaEta", "pass_BJetVeto"]
+        spec.notes = [f"Tuple of `{UPDATE}`: raw-level, no corrected mass/pT, no MET, no `Dijet_eta`; mass = `Dimuon_rawMass` (50-200 GeV window). "
+                      "VBF = `pass_BJetVeto` (cumulative flags), ggH = passes up to the electron veto, fails the VBF jet requirements, b-veto "
+                      "recomputed from the jet counts. Jets: `*_jesPt`."]
+    return spec
+
+
+PISA_UPDATE_VARIABLES = {
+    "m_mumu": "Dimuon_rawMass", "pt_mumu": "Dimuon_rawPt", "mu1_pt": None, "mu2_pt": None, "met_pt": None, "met_phi": None,
+    "jet1_pt": "LeadingJet_jesPt", "jet2_pt": "SubLeadingJet_jesPt", "eta_jj": None}
+RAW_MASS = {"TAMU": "m_mumu_nano", "Marmara": "mm_mass_raw", "NNU": "dimuon_raw_mass"}
+# Pisa only publishes the raw dimuon pT in this variant, so `pt_mumu` is the raw one for every group
+RAW_PT = {"TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "Pisa": "Dimuon_rawPt", "NNU": "dimuon_raw_pt"}
+
+
 def treat(group):
+    if VARIANT == UPDATE:
+        # Pisa defines the jet1_* variables only with at least 2 jets, TAMU with at least 1: compare them on events with >= 2 jets
+        for variable in VARIABLES:
+            if variable.name.startswith("jet1_"):
+                variable.min_jets = 2
     spec = TREATERS[group]()
     spec.variables = {v.name: v.expr[group] for v in VARIABLES if v.expr.get(group)}
+    if VARIANT == UPDATE and group in ("TAMU", "Marmara", "Pisa", "NNU"):
+        apply_update_variant(spec)
+        if group == "Pisa":
+            spec.variables = {k: v for k, v in spec.variables.items() if PISA_UPDATE_VARIABLES.get(k, v) is not None}
+            spec.variables.update({k: v for k, v in PISA_UPDATE_VARIABLES.items() if v is not None})
+        else:
+            spec.variables["m_mumu"] = RAW_MASS[group]
+        spec.variables["pt_mumu"] = RAW_PT[group]
     spec.channels = dict(spec.channels)
     add_leading_channels(spec)
     return spec
@@ -860,7 +1021,7 @@ def write_root_summary(output):
             "Raw tuple counts are not yields: the groups use different loose preselections.  Selected events are therefore always "
             "counted per region and channel, and events absent from one tuple are separated from events present but classified differently.", "",
             "| pair | sample | unique events A | unique events B | common | common / A | common / B |", "|---|---|---:|---:|---:|---:|---:|", *rows, "",
-            "Regenerate with `sync/python/compare_run3_sync_groups.py`; `--group1/--group2` restrict the pair and a new group is added with a `treat_<group>_ntuple` function.", ""]
+            "Regenerate with `sync/standalone/compare_run3_sync_groups.py`; `--group1/--group2` restrict the pair and a new group is added with a `treat_<group>_ntuple` function.", ""]
     (output / "SUMMARY.md").write_text("\n".join(text))
 
 
@@ -1129,7 +1290,7 @@ def compare_all_groups(sample, output, cache_dir, regions, channels, groups, fol
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--output", type=Path)
-    p.add_argument("--cache-dir", type=Path, default=Path("/tmp/vdamante/run3_sync_extracts"))
+    p.add_argument("--cache-dir", type=Path, default=Path("run3_sync_extracts"))
     p.add_argument("--group1", choices=TREATERS)
     p.add_argument("--group2", choices=TREATERS)
     p.add_argument("--sample", action="append", help="restrict to this sample (repeatable)")

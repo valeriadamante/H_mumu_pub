@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 W=${1:-/tmp/$USER/sync_repro_test}; rm -rf "$W"; mkdir -p "$W"
-python3 sync/python/compare_run3_sync_groups.py --group1 TAMU --group2 Pisa --sample ggH --region Z_sideband --channel inclusive \
+python3 sync/standalone/compare_run3_sync_groups.py --group1 TAMU --group2 Pisa --sample ggH --region Z_sideband --channel inclusive \
     --output "$W/out" --cache-dir "$W/cache" --no-overlay
 python3 sync/python/check_reproducibility.py "$W/out"
 echo "plots: $W/out/TAMU-Pisa/ggH/Z_sideband/inclusive/all_common_weights/*.png"

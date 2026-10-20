@@ -1,0 +1,105 @@
+HOW TO RECREATE THE YIELD TABLES AND PLOTS OF THE RUN 3 H->MUMU SYNCHRONISATION
+================================================================================
+Update after the Hmm meeting of 15 Oct 2026 (2024 data, Run2024H; ggH and VBFH signal).
+Groups: TAMU, Pisa, Marmara, Caltech, NNU, Iowa.
+
+Everything is done by ONE file, sync_compare.py. It needs no analysis framework and no CMSSW.
+
+1. SETUP
+--------
+Python >= 3.9 with numpy, awkward (>= 2), uproot (>= 5) and matplotlib:
+
+    python3 -m venv venv && source venv/bin/activate
+    pip install -r requirements.txt
+
+On lxplus the CMSSW python already has all four packages (source the analysis env.sh or any recent CMSSW).
+
+2. THE INPUT: THE COMMON NTUPLES
+--------------------------------
+Every group publishes its own ntuple, with its own branch names, in
+
+    /eos/cms/store/group/phys_higgs/cmshmm/run3_sync/<GROUP>/update_after_Hmm_15Oct/
+
+(read access needs a CERN account; copy the files with xrdcp/eoscp if you work elsewhere and point --base to the copy,
+keeping the same <GROUP>/update_after_Hmm_15Oct/... layout.)
+
+The dictionary GROUPS at the top of sync_compare.py says, for each group:
+  files    sample -> list of files (wildcards allowed). Samples: Data_Run2024H, ggH, VBFH
+  tree     name of the TTree
+  lumi     name of the luminosity-block branch (run and event are always called "run" and "event")
+  mass     branch with the dimuon mass used to define the regions (the RAW, uncorrected mass of every group: the
+           data are blinded in 115-135 GeV on this mass)
+  channels one boolean expression for ggH and one for VBF (what the group calls its ggH / VBF event)
+  weights  gen = generator weight only, all = generator * pileup * muon ID/iso * trigger (no b-tag SF, no lumi/xs factor)
+
+Channel definitions used (our reading of every tuple, to be confirmed by the owners):
+  TAMU     flags ggF / VBF (both include the baseline selection and the b-veto)
+  Pisa     VBF = pass_BJetVeto (cumulative flags); ggH = pass up to the electron veto, fail the VBF dijet-deta step, b-veto recomputed
+  Marmara  sel_full & cat_isGGH[:,0] / sel_full & cat_isVBF[:,0]
+  Caltech  is_ggH_category / is_VBF_category with event_pass_muon_trigger_match and event_pass_jet_veto
+  NNU      VBF = passAnalysisSelection; ggH = baseline of NNU's ntuple_info without the jet selection and not VBF. No ggH sample.
+  Iowa     VBF = baseline flags & passVBFCategoryApprox; ggH = baseline flags & not passVBFCategoryApprox. No ggH sample.
+
+Regions (on the raw mass):
+  Z_sideband  70 < m < 110 GeV
+  H_sideband  110 < m < 115 or 135 < m < 150 GeV
+  Signal_Fit  115 < m < 135 GeV   (empty for data: blinded)
+Only events with 70 < m < 150 GeV that are ggH or VBF are kept.
+
+3. STEP 1: YIELD AND OVERLAP TABLES
+-----------------------------------
+    python3 sync_compare.py yields --base /eos/cms/store/group/phys_higgs/cmshmm/run3_sync --outdir out
+
+Options: --groups TAMU Pisa ...   --samples Data_Run2024H VBFH ...
+The first run reads the ntuples (about 1-2 hours for everything; the big VBFH and data files dominate) and caches the
+selected events in out/cache/<group>_<sample>.npz. Delete the cache after a group publishes new files.
+
+Output in out/:
+  yields_<sample>.csv   group, sample, region, channel, events, sum_gen_weight, sum_all_weights
+  overlap_<sample>.csv  for every pair of groups, region and channel: nA, nB, common, common_over_A, common_over_B
+                        (events matched on run, luminosity block, event)
+  mass_<sample>.csv     raw m(mumu) histogram, 1 GeV bins, 70-150 GeV, per group and channel
+
+How the numbers are defined:
+  events          number of selected events (no weights)
+  sum_*_weight    sum of the weights of those events; the groups normalise their MC weights differently
+                  (lumi x cross-section is not included in the same way), so compare shapes or ratios between groups with care
+  common          events with the same (run, lumi, event) in the selection of both groups
+  duplicates      events with identical (run, lumi, event) inside one group and sample are counted once; the number of dropped
+                  rows is in the column duplicate_rows_dropped (e.g. the Pisa ggH file contains every event twice)
+
+4. STEP 2: PLOTS
+----------------
+    python3 sync_compare.py plots --outdir out --reference TAMU
+
+Written in out/ for every sample:
+  yield_bars_<sample>.png    bar chart of the selected events per mass region and channel, one bar per group (log scale)
+  yield_ratio_<sample>.png   events of every group divided by the reference group, with +-1% and +-5% bands
+  overlap_matrix_<sample>.png  matrix (ggH and VBF) of "common events / smaller selection" for every pair of groups, in %
+  mass_<sample>.png          raw dimuon-mass distribution of every group
+
+The plots only read the CSV tables, so they can be redrawn in seconds (change --reference, edit the plot functions).
+
+5. RECREATE THE PLOTS FROM THE PUBLISHED TABLES ONLY
+----------------------------------------------------
+If you already have the CSV tables (yields_*.csv, overlap_*.csv, mass_*.csv) in a folder, step 2 alone is enough:
+
+    python3 sync_compare.py plots --outdir <folder with the csv files> --reference TAMU
+
+6. ADD A GROUP
+--------------
+Add one entry to GROUPS (copy one of the existing ones), with the files, tree, branch names, the two channel
+expressions and the two weight expressions. Expressions are Python expressions on branch names with & | ~ == < >, abs(),
+and name[:,0] for the first entry of a jagged branch. Then run step 1 with --groups <name>, and step 2.
+
+7. EVENT-BY-EVENT COMPARISON OF TWO GROUPS (OPTIONAL)
+-----------------------------------------------------
+compare_run3_sync_groups.py is the detailed tool used for the pair summaries (distributions of ~40 variables in every region and channel,
+migration between regions, efficiency of the selection flags, a SUMMARY.md per pair). It is also a single file with the same
+dependencies:
+
+    export HMUMU_SYNC_VARIANT=update_after_Hmm_15Oct
+    python3 compare_run3_sync_groups.py --group1 TAMU --group2 Pisa --output pairs --cache-dir cache --no-overlay
+    python3 compare_run3_sync_groups.py --list        # list of groups, samples and pairs
+
+HMUMU_SYNC_BASE changes the location of the ntuples (default: the EOS folder above).
