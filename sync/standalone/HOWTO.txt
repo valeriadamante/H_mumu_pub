@@ -1,7 +1,10 @@
 HOW TO RECREATE THE YIELD TABLES AND PLOTS OF THE RUN 3 H->MUMU SYNCHRONISATION
 ================================================================================
-Update after the Hmm meeting of 15 Oct 2026 (2024 data, Run2024H; ggH and VBFH signal).
-Groups: TAMU, Pisa, Marmara, Caltech, NNU, Iowa.
+2024 data (Run2024H) and ggH / VBFH signal (ttH, ZH, WplusH where published). Two rounds of ntuples are covered:
+  before_15Oct  tuples published 12-15 Oct 2026 directly in the group folders: TAMU, Pisa, Marmara, PKU, Purdue, MIT, NNU, Caltech
+                (corrected dimuon mass; Caltech: its first small skim of 15 Oct)
+  after_15Oct   tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass): TAMU, Pisa, Marmara, Caltech, NNU, Iowa
+Choose the round with --round (default after_15Oct). Every command below accepts it.
 
 Everything is done by ONE file, sync_compare.py. It needs no analysis framework and no CMSSW.
 
@@ -18,21 +21,22 @@ On lxplus the CMSSW python already has all four packages (source the analysis en
 --------------------------------
 Every group publishes its own ntuple, with its own branch names, in
 
-    /eos/cms/store/group/phys_higgs/cmshmm/run3_sync/<GROUP>/update_after_Hmm_15Oct/
+    /eos/cms/store/group/phys_higgs/cmshmm/run3_sync/<GROUP>/                      (round before_15Oct)
+    /eos/cms/store/group/phys_higgs/cmshmm/run3_sync/<GROUP>/update_after_Hmm_15Oct/   (round after_15Oct)
 
 (read access needs a CERN account; copy the files with xrdcp/eoscp if you work elsewhere and point --base to the copy,
-keeping the same <GROUP>/update_after_Hmm_15Oct/... layout.)
+keeping the same <GROUP>/... layout.)
 
-The dictionary GROUPS at the top of sync_compare.py says, for each group:
-  files    sample -> list of files (wildcards allowed). Samples: Data_Run2024H, ggH, VBFH
+The dictionary ROUNDS at the top of sync_compare.py says, for each round and group:
+  files    sample -> list of files (wildcards allowed). Samples: Data_Run2024H, ggH, VBFH (default), ttH, ZH, WplusH (--samples)
   tree     name of the TTree
   lumi     name of the luminosity-block branch (run and event are always called "run" and "event")
-  mass     branch with the dimuon mass used to define the regions (the RAW, uncorrected mass of every group: the
-           data are blinded in 115-135 GeV on this mass)
+  mass     branch with the dimuon mass used to define the regions: the corrected (FSR/scale) mass in before_15Oct,
+           the RAW uncorrected mass in after_15Oct. The data are blinded in 115-135 GeV on this mass
   channels one boolean expression for ggH and one for VBF (what the group calls its ggH / VBF event)
   weights  gen = generator weight only, all = generator * pileup * muon ID/iso * trigger (no b-tag SF, no lumi/xs factor)
 
-Channel definitions used (our reading of every tuple, to be confirmed by the owners):
+Channel definitions used in after_15Oct (our reading of every tuple, to be confirmed by the owners; the before_15Oct ones are in ROUNDS):
   TAMU     flags ggF / VBF (both include the baseline selection and the b-veto)
   Pisa     VBF = pass_BJetVeto (cumulative flags); ggH = pass up to the electron veto, fail the VBF dijet-deta step, b-veto recomputed
   Marmara  sel_full & cat_isGGH[:,0] / sel_full & cat_isVBF[:,0]
@@ -48,9 +52,10 @@ Only events with 70 < m < 150 GeV that are ggH or VBF are kept.
 
 3. STEP 1: YIELD AND OVERLAP TABLES
 -----------------------------------
-    python3 sync_compare.py yields --base /eos/cms/store/group/phys_higgs/cmshmm/run3_sync --outdir out
+    python3 sync_compare.py yields --round after_15Oct --base /eos/cms/store/group/phys_higgs/cmshmm/run3_sync --outdir out_after
+    python3 sync_compare.py yields --round before_15Oct --base /eos/cms/store/group/phys_higgs/cmshmm/run3_sync --outdir out_before
 
-Options: --groups TAMU Pisa ...   --samples Data_Run2024H VBFH ...
+Options: --groups TAMU Pisa ... (groups of the chosen round)   --samples Data_Run2024H VBFH ttH ...   --outdir (default sync_out_<round>)
 The first run reads the ntuples (about 1-2 hours for everything; the big VBFH and data files dominate) and caches the
 selected events in out/cache/<group>_<sample>.npz. Delete the cache after a group publishes new files.
 
@@ -70,13 +75,21 @@ How the numbers are defined:
 
 4. STEP 2: PLOTS
 ----------------
-    python3 sync_compare.py plots --outdir out --reference TAMU
+    python3 sync_compare.py plots --round after_15Oct --outdir out_after --reference TAMU
 
 Written in out/ for every sample:
   yield_bars_<sample>.png    bar chart of the selected events per mass region and channel, one bar per group (log scale)
   yield_ratio_<sample>.png   events of every group divided by the reference group, with +-1% and +-5% bands
-  overlap_matrix_<sample>.png  matrix (ggH and VBF) of "common events / smaller selection" for every pair of groups, in %
+  overlap_matrix_<sample>.png  matrix (ggH and VBF): entry (row A, column B) = common events / events of the row group A, in %
+                             (the fraction of A's selected events that B also has; the matrix is not symmetric)
   mass_<sample>.png          raw dimuon-mass distribution of every group
+
+Written tables for reading or pasting (same CSV input):
+
+    python3 sync_compare.py markdown --round after_15Oct --outdir out_after
+
+  tables.md   yield table per sample (events per region and channel, duplicates dropped) and the overlap tables
+              (common / events of the row group, in %)
 
 The plots only read the CSV tables, so they can be redrawn in seconds (change --reference, edit the plot functions).
 
@@ -84,13 +97,13 @@ The plots only read the CSV tables, so they can be redrawn in seconds (change --
 ----------------------------------------------------
 If you already have the CSV tables (yields_*.csv, overlap_*.csv, mass_*.csv) in a folder, step 2 alone is enough:
 
-    python3 sync_compare.py plots --outdir <folder with the csv files> --reference TAMU
+    python3 sync_compare.py plots --round <round> --outdir <folder with the csv files> --reference TAMU
 
 6. ADD A GROUP
 --------------
-Add one entry to GROUPS (copy one of the existing ones), with the files, tree, branch names, the two channel
+Add one entry to a round in ROUNDS (copy one of the existing ones; a new round is a new key of ROUNDS), with the files, tree, branch names, the two channel
 expressions and the two weight expressions. Expressions are Python expressions on branch names with & | ~ == < >, abs(),
-and name[:,0] for the first entry of a jagged branch. Then run step 1 with --groups <name>, and step 2.
+and name[:,0] for the first entry of a jagged branch. Then run step 1 with --round <round> --groups <name>, and step 2.
 
 7. EVENT-BY-EVENT COMPARISON OF TWO GROUPS (OPTIONAL)
 -----------------------------------------------------

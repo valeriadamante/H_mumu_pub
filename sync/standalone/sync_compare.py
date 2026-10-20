@@ -9,14 +9,19 @@ Two steps (full instructions in HOWTO.txt):
        yields_<sample>.csv   events and sum of weights per group, mass region and channel
        overlap_<sample>.csv  events present in both groups of every pair (matched on run, lumi, event)
        mass_<sample>.csv     m(mumu) distribution of every group (selected ggH or VBF events, 70-150 GeV)
-  2. plots  : draw bar charts of the yields, the ratio to a reference group, and the overlap matrices from those tables.
+  2. plots  : draw bar charts of the yields, the ratio to a reference group, and the overlap matrices (common events / events of the row group) from those tables.
 
-  python3 sync_compare.py yields --base /eos/cms/store/group/phys_higgs/cmshmm/run3_sync --outdir out
-  python3 sync_compare.py plots  --outdir out --reference TAMU
+  python3 sync_compare.py yields --round after_15Oct --base /eos/cms/store/group/phys_higgs/cmshmm/run3_sync --outdir out
+  python3 sync_compare.py plots  --round after_15Oct --outdir out --reference TAMU
+  python3 sync_compare.py markdown --round after_15Oct --outdir out      # tables.md with the yield and overlap tables
 
-A group is one entry of GROUPS below: the files of every sample, the tree name, the dimuon-mass branch used for the
+Rounds (ROUNDS below): before_15Oct = tuples published 12-15 Oct 2026 directly in the group folders (TAMU, Pisa, Marmara, PKU,
+Purdue, MIT, NNU, Caltech); after_15Oct = tuples of <group>/update_after_Hmm_15Oct (TAMU, Pisa, Marmara, Caltech, NNU, Iowa).
+Add --samples ttH ZH WplusH for the other signal samples (TAMU, PKU, Purdue).
+
+A group is one entry of a round in ROUNDS below: the files of every sample, the tree name, the dimuon-mass branch used for the
 regions, one boolean expression per channel (ggH, VBF) and the weight expressions.  A new group is added by adding one entry.
-Expressions are Python expressions on branch names; `name[:,0]` is the first entry of a jagged branch.
+Expressions are Python expressions on branch names (with abs, sqrt, hypot, cos, sin, cosh, sinh); `name[:,0]` is the first entry of a jagged branch.
 """
 import argparse
 import csv
@@ -35,13 +40,100 @@ import uproot
 # ----------------------------------------------------------------------------------------------
 # Description of the groups (update_after_Hmm_15Oct tuples; paths are relative to --base)
 # ----------------------------------------------------------------------------------------------
-GROUPS = {'TAMU': {'tree': 'Events',
+ROUNDS = {
+    # tuples published 12-15 Oct 2026, directly in the group folder (corrected dimuon mass; Caltech: first small skim of 15 Oct)
+    'before_15Oct': {'TAMU': {'tree': 'Events',
+          'lumi': 'luminosityBlock',
+          'mass': 'm_mumu_FSR_corr',
+          'files': {'Data_Run2024H': ['TAMU/TAMU-Run2024H.root'],
+                    'ggH': ['TAMU/TAMU-GluGluHto2Mu.root'],
+                    'VBFH': ['TAMU/TAMU-VBFHto2Mu_M125_powheg.root'],
+                    'ttH': ['TAMU/TAMU-TTH_Hto2Mu.root'],
+                    'ZH': ['TAMU/TAMU-ZH_Hto2Mu.root'],
+                    'WplusH': ['TAMU/TAMU-WplusH_Hto2Mu.root']},
+          'channels': {'ggH': 'ggF', 'VBF': 'VBF'},
+          'weights': {'gen': 'weight_generator', 'all': 'weight_generator*weight_pileup*weight_muon_idiso*weight_trigger'}},
+ 'Pisa': {'tree': 'Events',
+          'lumi': 'luminosityBlock',
+          'mass': 'Dimuon_mass',
+          'files': {'Data_Run2024H': ['PISA/PISA-Muon0_Run2024H-MINIv6NANOv15-v1/Events.root',
+                                      'PISA/PISA-Muon1_Run2024H-MINIv6NANOv15-v2/Events.root'],
+                    'ggH': ['PISA/PISA-GluGluH-Hto2Mu_Par-M-125_2024Summer24NanoAODv15-v2/Events.root'],
+                    'VBFH': ['PISA/PISA-VBFH-Hto2Mu_Par-M-125_2024Summer24NanoAODv15-v2/Events.root']},
+          'channels': {'ggH': '(first_failed_step >= 13) & (first_failed_step <= 16) & (nMediumBTagJet == 0) & (nLooseBTagJet < 2)',
+                       'VBF': '(first_failed_step == 0) | (first_failed_step >= 18)'},
+          'weights': {'gen': 'Generator_weight', 'all': 'Generator_weight*PuSF*MuIdIsoSF*MuTrgSF'}},
+ 'Marmara': {'tree': 'HmmTree',
+             'lumi': 'lumi',
+             'mass': 'mm_mass_fsr',
+             'files': {'Data_Run2024H': ['Marmara/tree_DATA_2024_loose_for_ALL_2024_H_Data_Samples.root'],
+                       'ggH': ['Marmara/tree_GGH_2024_loose_LAST.root'],
+                       'VBFH': ['Marmara/tree_VBF_2024_loose_LAST.root']},
+             'channels': {'ggH': 'sel_full & cat_isGGH[:,0]', 'VBF': 'sel_full & cat_isVBF[:,0]'},
+             'weights': {'gen': 'w_gen', 'all': 'w_total'}},
+ 'PKU': {'tree': 'ntuple',
+         'lumi': 'lumi',
+         'mass': 'diMufsr_kit_BSC_mass',
+         'files': {'Data_Run2024H': ['PKU/Muon_24H.root'],
+                   'ggH': ['PKU/GluGluH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
+                   'VBFH': ['PKU/VBFH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
+                   'ttH': ['PKU/TTH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
+                   'ZH': ['PKU/ZH-Hto2Mu_Par-M-125_powhegMINLO_RunIII2024Summer24.root'],
+                   'WplusH': ['PKU/WplusH-Hto2Mu_Par-M-125_powhegMINLO_RunIII2024Summer24.root']},
+         'channels': {'ggH': 'GGH', 'VBF': 'VBF'},
+         'weights': {'gen': 'weight', 'all': 'eventWeight'}},
+ 'Purdue': {'tree': 'Events',
+            'lumi': 'luminosityBlock',
+            'mass': 'dimuon_mass',
+            'files': {'Data_Run2024H': ['Purdue/Purdue-Muon0_Run2024H-MINIv6NANOv15-v1/*.root',
+                                        'Purdue/Purdue-Muon1_Run2024H-MINIv6NANOv15-v2/*.root'],
+                      'ggH': ['Purdue/Purdue-GluGluH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8/*.root'],
+                      'VBFH': ['Purdue/Purdue-VBFH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8/*.root'],
+                      'ttH': ['Purdue/Purdue-TTH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8/*.root'],
+                      'ZH': ['Purdue/Purdue-ZH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powhegMINLO-pythia8/*.root'],
+                      'WplusH': ['Purdue/Purdue-WplusH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powhegMINLO-pythia8/*.root']},
+            'channels': {'ggH': '(pass_analysis_preselection == 1) & (cat_ggh == 1)',
+                         'VBF': '(pass_analysis_preselection == 1) & (cat_vbf == 1)'},
+            'weights': {'gen': 'separate_wgt_genWeight', 'all': 'wgt_nominal'}},
+ 'MIT': {'tree': 'events',
+         'lumi': 'luminosityBlock',
+         'mass': 'HiggsCandCorrMass',
+         'files': {'Data_Run2024H': ['MIT/VBF-GGH/snapshot_mc_-51_2024_ggHcat_synch.root',
+                                     'MIT/VBF-GGH/snapshot_mc_-52_2024_ggHcat_synch.root'],
+                   'ggH': ['MIT/VBF-GGH/snapshot_mc_11_2024_ggHcat_synch.root'],
+                   'VBFH': ['MIT/VBF-GGH/snapshot_mc_10_2024_ggHcat_synch.root']},
+         'channels': {'ggH': '(nBMJets == 0) & ~((Mjj > 400) & (abs(jetVBF1_Eta - jetVBF2_Eta) > 2.5))',
+                      'VBF': '(nBMJets == 0) & (Mjj > 400) & (abs(jetVBF1_Eta - jetVBF2_Eta) > 2.5)'},
+         'weights': {'gen': 'w', 'all': 'w_allSF'}},
+ 'NNU': {'tree': 'Events',
+         'lumi': 'luminosityBlock',
+         'mass': 'dimuon_fsr_mass',
+         'files': {'Data_Run2024H': ['NNU/NNU-dataH_2024_muon01.root'], 'VBFH': ['NNU/NNU-VBFH-Hto2Mu_M125_RunIII2024Summer24.root']},
+         'channels': {'VBF': 'passAnalysisSelection',
+                      'ggH': '(passLumiJSON & passTrigger & passTriggerMatch & passOS & passCandidateGoodMuons & passElectronVeto & '
+                             'passBTagVeto & passMETFilters & passJetVetoMap & passLeadPt & passPV & passExactly2GoodMuons) & (category != '
+                             '3)'},
+         'weights': {'gen': 'genWeight', 'all': 'weightBaseNoNorm'}},
+ 'Caltech': {'tree': 'tree_output',
+             'lumi': 'luminosityBlock',
+             'mass': 'diMuon_bscMass_noCorr',
+             'files': {'Data_Run2024H': ['Caltech/Muon0_2024H_skim.root', 'Caltech/Muon1_2024H_skim.root'],
+                       'ggH': ['Caltech/ggH_skim.root'],
+                       'VBFH': ['Caltech/VBF_skim.root']},
+             'channels': {'ggH': '(is_ggH_category == 1) & event_pass_muon_trigger_match & event_pass_jet_veto',
+                          'VBF': '(is_VBF_category == 1) & event_pass_muon_trigger_match & event_pass_jet_veto'},
+             'weights': {'gen': 'gen_weight', 'all': 'gen_weight*pileup_weight*mu_trig_eff_SF*mu_ID_eff_SF*mu_ISO_eff_SF'}}},
+    # tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass)
+    'after_15Oct': {'TAMU': {'tree': 'Events',
           'lumi': 'luminosityBlock',
           'mass': 'm_mumu_nano',
           'files': {'Data_Run2024H': ['TAMU/update_after_Hmm_15Oct/TAMU-Run2024H.root'],
                     'ggH': ['TAMU/update_after_Hmm_15Oct/TAMU-GluGluHto2Mu.root'],
                     'VBFH': ['TAMU/update_after_Hmm_15Oct/TAMU-VBFHto2Mu_M125_powheg.root',
-                             'TAMU/update_after_Hmm_15Oct/TAMU-VBFHto2Mu_M125_powheg_ext1.root']},
+                             'TAMU/update_after_Hmm_15Oct/TAMU-VBFHto2Mu_M125_powheg_ext1.root'],
+                    'ttH': ['TAMU/update_after_Hmm_15Oct/TAMU-TTH_Hto2Mu.root'],
+                    'ZH': ['TAMU/update_after_Hmm_15Oct/TAMU-ZH_Hto2Mu.root'],
+                    'WplusH': ['TAMU/update_after_Hmm_15Oct/TAMU-WplusH_Hto2Mu.root']},
           'channels': {'ggH': 'ggF', 'VBF': 'VBF'},
           'weights': {'gen': 'weight_generator', 'all': 'weight_generator*weight_pileup*weight_muon_idiso*weight_trigger'}},
  'Pisa': {'tree': 'Events',
@@ -91,9 +183,13 @@ GROUPS = {'TAMU': {'tree': 'Events',
                        'VBF': 'passGolden & passFilters & passHLTAndObjectMatch & passAnalysisMuonSelection & passExactlyTwoAnalysisMuons '
                               '& passElectronVeto & passAdditionalLeptonVeto & passJetVetoMap & passBJetVeto & passVertex & '
                               'analysisPairPassesRawWindow & oppositeSign & passVBFCategoryApprox'},
-          'weights': {'gen': 'weightGenerator', 'all': 'weightGenerator*weightPileup*weightMuonIDISO*weightTrigger'}}}
+          'weights': {'gen': 'weightGenerator', 'all': 'weightGenerator*weightPileup*weightMuonIDISO*weightTrigger'}}},
+}
+ROUND = "after_15Oct"                  # selected with --round
+GROUPS = ROUNDS[ROUND]
 
-SAMPLES = ["Data_Run2024H", "ggH", "VBFH"]
+SAMPLES = ["Data_Run2024H", "ggH", "VBFH"]            # default
+ALL_SAMPLES = SAMPLES + ["ttH", "ZH", "WplusH"]       # available for some groups (--samples)
 CHANNELS = ["ggH", "VBF"]
 # mass regions on the group's raw dimuon mass; the data are blinded in the signal window
 REGIONS = {"Z_sideband": (70, 110), "H_sideband": None, "Signal_Fit": (115, 135)}
@@ -123,6 +219,7 @@ def evaluate(arrays, expression):
     expression = re.sub(r"(\w+)\[:,0\]", r"first(\1)", expression)
     scope = {name: arrays[name] for name in branch_names(expression) if name in arrays.fields}
     scope["first"] = first
+    scope.update(abs=np.abs, sqrt=np.sqrt, hypot=np.hypot, cos=np.cos, sin=np.sin, cosh=np.cosh, sinh=np.sinh)
     return np.asarray(ak.to_numpy(eval(expression, {"__builtins__": {}}, scope)))
 
 
@@ -180,10 +277,10 @@ def read_sample(base, spec, sample, step_size=500_000):
 
 def load_or_read(base, group, sample, outdir):
     """Read the ntuple once; the selected events are cached in <outdir>/cache/<group>_<sample>.npz."""
-    cache = Path(outdir) / "cache" / f"{group}_{sample}.npz"
+    cache = Path(outdir) / "cache" / ROUND / f"{group}_{sample}.npz"
     if cache.exists():
         return dict(np.load(cache))
-    print(f"[read] {group} {sample}", flush=True)
+    print(f"[read] {ROUND} {group} {sample}", flush=True)
     result = read_sample(base, GROUPS[group], sample)
     cache.parent.mkdir(parents=True, exist_ok=True)
     np.savez(cache, **result)
@@ -329,8 +426,8 @@ def plot_overlap(outdir, sample, rows):
                         nB += int(r["nB"]) if r["groupA"] == a else int(r["nA"])
                         common += int(r["common"])
                 if nA and nB:
-                    matrix[a_i, b_i] = common / min(nA, nB)
-        image = ax.imshow(matrix, vmin=0.7, vmax=1.0, cmap="viridis")
+                    matrix[a_i, b_i] = common / nA     # fraction of the row group's events that the column group also has
+        image = ax.imshow(matrix, vmin=0.5, vmax=1.0, cmap="viridis")
         ax.set_xticks(range(len(groups)))
         ax.set_xticklabels(groups, rotation=45, ha="right")
         ax.set_yticks(range(len(groups)))
@@ -339,7 +436,7 @@ def plot_overlap(outdir, sample, rows):
             for j in range(len(groups)):
                 if not np.isnan(matrix[i, j]):
                     ax.text(j, i, f"{100 * matrix[i, j]:.1f}", ha="center", va="center", color="w", fontsize=8)
-        ax.set_title(f"{sample} {channel}: common / smaller selection [%]")
+        ax.set_title(f"{sample} {channel}: common / events of the row group [%]")
         fig.colorbar(image, ax=ax, fraction=0.046)
     fig.tight_layout()
     fig.savefig(outdir / f"overlap_matrix_{sample}.png", dpi=130)
@@ -358,7 +455,7 @@ def plot_mass(outdir, sample, rows):
             edges = np.array([float(r["low"]) for r in sel] + [float(sel[-1]["high"])])
             counts = np.array([float(r["events"]) for r in sel])
             ax.stairs(counts, edges, label=g, color=colour[g])
-        ax.set_xlabel("raw m(mumu) [GeV]")
+        ax.set_xlabel("m(mumu) used for the regions [GeV]")
         ax.set_ylabel("events / GeV")
         ax.set_title(f"{sample} {channel}")
         ax.legend(fontsize=8)
@@ -379,20 +476,68 @@ def step_plots(args):
             print(f"[plots] {sample}", flush=True)
 
 
+def md_table(header, rows):
+    return ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)] + ["| " + " | ".join(r) + " |" for r in rows] + [""]
+
+
+def step_markdown(args):
+    """tables.md: the yield tables and the overlap tables (common / events of the row group) of every sample, from the CSV files."""
+    outdir = Path(args.outdir)
+    lines = [f"# Yields and event overlap, round {ROUND}\n",
+             "Events with the same (run, lumi, event) are counted once per group and sample; regions are on the mass branch of each group "
+             "(see HOWTO.txt); data Signal_Fit is blinded.\n"]
+    for sample in args.samples or SAMPLES:
+        if not (outdir / f"yields_{sample}.csv").exists():
+            continue
+        rows = read_csv(outdir / f"yields_{sample}.csv")
+        groups = list(dict.fromkeys(r["group"] for r in rows))
+        lines += [f"## {sample}: selected events per region and channel\n"]
+        cell_list = list(dict.fromkeys((r["region"], r["channel"]) for r in rows))
+        lines += md_table(["region / channel"] + groups,
+                          [[f"{reg} / {ch}"] + [f"{int(next(r['events'] for r in rows if (r['group'], r['region'], r['channel']) == (g, reg, ch))):,}" for g in groups]
+                           for reg, ch in cell_list])
+        lines += ["Duplicate rows dropped: " + ", ".join(f"{g} {int(next(r['duplicate_rows_dropped'] for r in rows if r['group'] == g)):,}" for g in groups) + "\n"]
+        overlap = read_csv(outdir / f"overlap_{sample}.csv")
+        names = sorted({r["groupA"] for r in overlap} | {r["groupB"] for r in overlap})
+        for channel in CHANNELS:
+            lines += [f"### {sample} {channel}: common events / events of the row group [%] (all regions summed)\n"]
+            table = []
+            for a in names:
+                row = [a]
+                for b in names:
+                    n_a = common = 0
+                    for r in overlap:
+                        if a != b and r["channel"] == channel and {r["groupA"], r["groupB"]} == {a, b}:
+                            n_a += int(r["nA"]) if r["groupA"] == a else int(r["nB"])
+                            common += int(r["common"])
+                    row.append("-" if a == b or not n_a else f"{100 * common / n_a:.1f}")
+                table.append(row)
+            lines += md_table(["row \\ column"] + names, table)
+    (outdir / "tables.md").write_text("\n".join(lines))
+    print(f"[markdown] {outdir / 'tables.md'}", flush=True)
+
+
 def main():
+    global ROUND, GROUPS
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="step", required=True)
-    for name in ("yields", "plots"):
+    for name in ("yields", "plots", "markdown"):
         p = sub.add_parser(name)
-        p.add_argument("--outdir", default="sync_out", help="where tables, plots and the cache are written")
-        p.add_argument("--samples", nargs="+", choices=SAMPLES)
+        p.add_argument("--round", default="after_15Oct", choices=list(ROUNDS), help="which set of published ntuples")
+        p.add_argument("--outdir", default=None, help="where tables, plots and the cache are written (default sync_out_<round>)")
+        p.add_argument("--samples", nargs="+", choices=ALL_SAMPLES)
+        p.add_argument("--groups", nargs="+", help="groups of the round (default: all of them)")
         if name == "yields":
             p.add_argument("--base", default="/eos/cms/store/group/phys_higgs/cmshmm/run3_sync", help="directory with one folder per group")
-            p.add_argument("--groups", nargs="+", choices=list(GROUPS))
-        else:
+        elif name == "plots":
             p.add_argument("--reference", default="TAMU", help="group the yield ratios are computed against")
     args = parser.parse_args()
-    {"yields": step_yields, "plots": step_plots}[args.step](args)
+    ROUND, GROUPS = args.round, ROUNDS[args.round]
+    args.outdir = args.outdir or f"sync_out_{ROUND}"
+    unknown = [g for g in args.groups or [] if g not in GROUPS]
+    if unknown:
+        parser.error(f"groups not in round {ROUND}: {unknown}; available: {list(GROUPS)}")
+    {"yields": step_yields, "plots": step_plots, "markdown": step_markdown}[args.step](args)
 
 
 if __name__ == "__main__":
