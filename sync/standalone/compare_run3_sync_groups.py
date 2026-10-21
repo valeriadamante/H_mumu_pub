@@ -297,12 +297,9 @@ def treat_Caltech_ntuple():
          "the normalisation (like the other groups' un-normalised weights); `weight` is only comparable after dividing by that constant."])
 
 
-IOWA_UPDATE = "update_fullScaRe_21Oct"      # Iowa round 3 (21 Oct, full ScaRe), same schema as update_after_Hmm_15Oct
-
-
 def iowa_files():
     """Iowa publishes per-job files: data = Muon0 + Muon1, VBFH = VBF (no ggH sample)."""
-    d = BASE / "Iowa" / IOWA_UPDATE
+    d = BASE / "Iowa" / UPDATE
     rel = lambda sub: sorted(str(p.relative_to(BASE)) for p in (d / sub).glob("*.root"))
     return {"Data_Run2024H": rel("Muon0") + rel("Muon1"), "VBFH": rel("VBF")}
 
@@ -312,7 +309,7 @@ def treat_Iowa_ntuple():
     base = ("passGolden & passFilters & passHLTAndObjectMatch & passAnalysisMuonSelection & passExactlyTwoAnalysisMuons & passElectronVeto & "
             "passAdditionalLeptonVeto & passJetVetoMap & passBJetVeto & passVertex & analysisPairPassesRawWindow & oppositeSign")
     return GroupSpec(
-        "Iowa", iowa_files() if (BASE / "Iowa" / IOWA_UPDATE).exists() else {},
+        "Iowa", iowa_files() if (BASE / "Iowa" / UPDATE).exists() else {},
         "SyncEvents", "luminosityBlock", "massRaw",
         {"ggH": f"{base} & ~passVBFCategoryApprox", "VBF": f"{base} & passVBFCategoryApprox"},
         {"genWeights": "weightGenerator", "all_common_weights": "weightGenerator*weightPileup*weightMuonIDISO*weightTrigger"},

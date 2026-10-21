@@ -208,8 +208,8 @@ ROUNDS = {
  'Iowa': {'tree': 'SyncEvents',
           'lumi': 'luminosityBlock',
           'mass': 'massRaw',
-          'files': {'Data_Run2024H': ['Iowa/update_fullScaRe_21Oct/Muon0/*.root', 'Iowa/update_fullScaRe_21Oct/Muon1/*.root'],
-                    'VBFH': ['Iowa/update_fullScaRe_21Oct/VBF/*.root']},
+          'files': {'Data_Run2024H': ['Iowa/update_after_Hmm_15Oct/Muon0/*.root', 'Iowa/update_after_Hmm_15Oct/Muon1/*.root'],
+                    'VBFH': ['Iowa/update_after_Hmm_15Oct/VBF/*.root']},
           'channels': {'ggH': 'passGolden & passFilters & passHLTAndObjectMatch & passAnalysisMuonSelection & passExactlyTwoAnalysisMuons '
                               '& passElectronVeto & passAdditionalLeptonVeto & passJetVetoMap & passBJetVeto & passVertex & '
                               'analysisPairPassesRawWindow & oppositeSign & ~passVBFCategoryApprox',

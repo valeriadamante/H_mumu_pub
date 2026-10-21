@@ -3,7 +3,7 @@ HOW TO RECREATE THE YIELD TABLES AND PLOTS OF THE RUN 3 H->MUMU SYNCHRONISATION
 2024 data (Run2024H) and ggH / VBFH signal (ttH, ZH, WplusH where published). Two rounds of ntuples are covered:
   before_15Oct  tuples published 12-15 Oct 2026 directly in the group folders: TAMU, Pisa, Marmara, PKU, Purdue, MIT, NNU, Caltech
                 (corrected dimuon mass; Caltech: its first small skim of 15 Oct)
-  after_15Oct   tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass): TAMU, Pisa, Marmara, Caltech, NNU, Iowa (folder update_fullScaRe_21Oct),
+  after_15Oct   tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass): TAMU, Pisa, Marmara, Caltech, NNU, Iowa,
                 Purdue, PKU, MIT (path MIT/VBF-GGH/update_after_Hmm_15Oct)
 Choose the round with --round (default after_15Oct). For compare_run3_sync_groups.py export HMUMU_SYNC_VARIANT=update_after_Hmm_15Oct. Every command below accepts it.
 
