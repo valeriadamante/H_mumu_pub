@@ -1,0 +1,143 @@
+# Variant ggfvbf_iso_20261014: as the Pisa-aligned selection, with the muon isolation of the main analysis (pfIsoId >= 2).
+# Exchange-tuple selections that reproduce Pisa (Filippo) on the inclusive
+# ggF/VBF tuple: variant ggfvbf_pisa_20261013 of sync/python/special_sync_skim.py.
+# The tuple keeps the inclusive preselection of ggfvbf_20261015, but where an event
+# has exactly two good and two loose muons (flag pisa_candidate) the dimuon is that
+# pair, and every analysis flag below follows selections_sync_filippo_20260925.yaml
+# (FSR-corrected dimuon mass, trigger matching without pT cut on the matched muon,
+# TightLepVeto, horn 2.5<|eta|<3, (j0,j1) VBF pair, b-veto on pT>20 jets).
+# All intermediate flags are stored so the first failed step can be traced.
+masses_regions:
+  Z_sideband:
+    expression: "dimuon_mass > 76 && dimuon_mass < 110"
+    store: true
+  Signal_Fit:
+    expression: "dimuon_mass > 115 && dimuon_mass < 135"
+    store: true
+  H_sideband:
+    expression: "(dimuon_mass > 110 && dimuon_mass < 115) || (dimuon_mass > 135 && dimuon_mass < 150)"
+    store: true
+  Signal_ext:
+    expression: "dimuon_mass > 110 && dimuon_mass < 150"
+    store: true
+  mass_inclusive:
+    expression: "dimuon_mass > 60 && dimuon_mass < 150"
+    store: true
+  mass_50_200:
+    expression: "dimuon_mass > 50 && dimuon_mass < 200"
+    store: true
+  Z_CR_H_SB:
+    expression: "(dimuon_mass > 76 && dimuon_mass < 115) || (dimuon_mass > 130 && dimuon_mass < 150)"
+    store: true
+
+muons_selection:
+  # Golden JSON (data) and MET filters are skim filters in the Pisa selection;
+  # the exchange tuple stores them as flags.
+  good_event:
+    expression: "pass_golden_json && pass_met_filters"
+    store: true
+  muon_pre_sel_check:
+    expression: "mu1_pt > 10 && abs(mu1_eta) < 2.4 && mu2_pt > 10 && abs(mu2_eta) < 2.4"
+    store: true
+  muons_OS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} < 0"
+    store: true
+  muons_SS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} > 0"
+    store: true
+  muons_trigger:
+    expression: "Event_HasTriggerMatching_singleMu{mu_suff} && HLT_IsoMu24 && (mu1_HasTriggerMatching_singleMu{mu_suff} || mu2_HasTriggerMatching_singleMu{mu_suff})"
+    store: true
+  muons_OS_presel_trg:
+    expression: "muon_pre_sel_check{mu_suff} && muons_OS{mu_suff} && muons_trigger{mu_suff}"
+    store: true
+  mu1_pt_g26:
+    expression: "mu1_pt{mu_suff} > 26"
+    store: true
+  mu2_pt_g20:
+    expression: "mu2_pt{mu_suff} > 20"
+    store: true
+  mu_pt_sel:
+    expression: "mu1_pt_g26{mu_suff} && mu2_pt_g20{mu_suff}"
+    store: true
+  mu1_ML:
+    expression: "mu1_mediumId{mu_suff} && mu1_pfIsoId{mu_suff} >= 2 && abs(mu1_dz{mu_suff}) < 0.1 && abs(mu1_dxy{mu_suff}) < 0.05"
+    store: true
+  mu2_ML:
+    expression: "mu2_mediumId{mu_suff} && mu2_pfIsoId{mu_suff} >= 2 && abs(mu2_dz{mu_suff}) < 0.1 && abs(mu2_dxy{mu_suff}) < 0.05"
+    store: true
+  bothMuons_ML:
+    expression: "mu1_ML{mu_suff} && mu2_ML{mu_suff}"
+    store: true
+  exactly_2_loose_muons:
+    expression: "n_looseMuons == 2"
+    store: true
+  electron_veto:
+    expression: "n_goodElectrons == 0"
+    store: true
+
+jets_selection:
+  has_good_jets:
+    expression: "N_SelectedJets{jet_suff} >= 0"
+    store: true
+  jets_btag_clean_sel:
+    expression: "BJetVeto20"
+    store: true
+
+categories:
+  base_sel_muons:
+    expression: "good_event && muons_OS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && bothMuons_ML{mu_suff} && exactly_2_loose_muons && electron_veto"
+    store: true
+  baseline:
+    expression: "base_sel_muons{tot_suff} && BJetVeto20"
+    store: true
+  VBF_def:
+    expression: "HasVBF{jet_suff}"
+    store: true
+  VBF:
+    expression: "baseline{tot_suff} && VBF_def{tot_suff}"
+    store: true
+  ggF:
+    expression: "baseline{tot_suff} && !VBF_def{tot_suff}"
+    store: true
+  ggF_0J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 0"
+    store: true
+  ggF_1J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 1"
+    store: true
+  ggF_2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 2"
+    store: true
+  ggF_ge2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+  VBF_ge2J:
+    expression: "VBF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+
+# Cumulative steps appended after the skim report counts.
+cutflow:
+  - base_sel_muons
+  - baseline
+  - mass_inclusive
+
+# Same order as Filippo's first_failed_step (from pass_TwoMuons on); the skim
+# has already applied two muons, the loose-muon veto and the trigger match.
+cutflow_vbf_Z_CR_H_SB:
+  - good_event
+  - muon_pre_sel_check
+  - muons_OS
+  - mu1_pt_g26
+  - mu2_pt_g20
+  - bothMuons_ML
+  - muons_trigger
+  - jets_ge2
+  - filippo_LeadingJetPt
+  - filippo_DijetMass
+  - filippo_DijetDeltaEta
+  - jets_btag_clean_sel
+  - electron_veto
+  - exactly_2_loose_muons
+  - VBF
+  - Z_CR_H_SB

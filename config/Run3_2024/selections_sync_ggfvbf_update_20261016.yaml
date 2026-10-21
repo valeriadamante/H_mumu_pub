@@ -1,0 +1,177 @@
+# Selections of the ggfvbf_update_20261016 tuple (update after the Hmm meeting of 15 Oct 2026).  Everything is a flag.
+# The tuple keeps the events of base_sel_muons with 50 < m(mumu, raw) < 200: golden JSON and MET filters, single-muon trigger
+# with the match on at least one of mu1/mu2, opposite sign, raw pT > 20 on both muons (also in the categories), medium ID,
+# raw pfRelIso04_all < 0.25, exactly two good muons, electron veto (pT > 20, |eta| < 2.5, mvaIso WP90).  The b veto is not
+# applied to the tuple, only stored (jets_btag_clean_sel); data in 115-135 GeV (any mass definition) are removed.
+# Jets: JERC pT > 30, |eta| < 4.7, tight ID, veto maps, 2024 horn veto of the config; b veto UParTAK4 N_medium = 0, N_loose < 2 (tagger evaluated for |eta| < 2.5 only).
+# VBF: leading-jet definition (HasVBF == HasVBF_leading) and maximum-m_jj definition (HasVBF_maxmjj), both pT > 35/30,
+# m_jj > 400 and |deta| > 2.5; the categories of the second one carry the suffix _maxmjj.
+masses_regions:
+  Z_sideband:
+    expression: "dimuon_mass > 70 && dimuon_mass < 110"
+    store: true
+  Signal_Fit:
+    expression: "dimuon_mass > 115 && dimuon_mass < 135"
+    store: true
+  H_sideband:
+    expression: "(dimuon_mass > 110 && dimuon_mass < 115) || (dimuon_mass > 135 && dimuon_mass < 150)"
+    store: true
+  Signal_ext:
+    expression: "dimuon_mass > 110 && dimuon_mass < 150"
+    store: true
+  mass_inclusive:
+    expression: "dimuon_mass > 60 && dimuon_mass < 150"
+    store: true
+  Z_CR_H_SB:
+    expression: "(dimuon_mass > 76 && dimuon_mass < 115) || (dimuon_mass > 130 && dimuon_mass < 150)"
+    store: true
+  # Window of the sync tuple, on the raw (uncorrected) dimuon mass.
+  mass_50_200:
+    expression: "m_mumu_raw > 50 && m_mumu_raw < 200"
+    store: true
+
+muons_selection:
+  muon_pre_sel_check:
+    expression: "mu1_pt_raw_noCorr > 20 && abs(mu1_eta_raw_noCorr) < 2.4 && mu2_pt_raw_noCorr > 20 && abs(mu2_eta_raw_noCorr) < 2.4"
+    store: true
+  muons_OS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} < 0"
+    store: true
+  muons_SS:
+    expression: "mu1_charge{mu_suff} * mu2_charge{mu_suff} > 0"
+    store: false
+  muons_trigger:
+    expression: "Event_HasTriggerMatching_singleMu{mu_suff} && HLT_IsoMu24 && (mu1_HasTriggerMatching_singleMu{mu_suff} || mu2_HasTriggerMatching_singleMu{mu_suff})"
+    store: true
+  muons_OS_presel_trg:
+    expression: "muon_pre_sel_check{mu_suff} && muons_OS{mu_suff} && muons_trigger{mu_suff}"
+    store: false
+  muons_SS_presel_trg:
+    expression: "muon_pre_sel_check{mu_suff} && muons_SS{mu_suff} && muons_trigger{mu_suff}"
+    store: false
+  mu1_pt_raw_g20:
+    expression: "mu1_pt_raw_noCorr > 20"
+    store: true
+  mu2_pt_raw_g20:
+    expression: "mu2_pt_raw_noCorr > 20"
+    store: true
+  # corrected-pT cuts of the previous analysis selection: stored for comparison only, not used by any category
+  mu1_pt_g26:
+    expression: "mu1_pt_FSR_corr{mu_suff} > 26"
+    store: true
+  mu2_pt_g20:
+    expression: "mu2_pt_FSR_corr{mu_suff} > 20"
+    store: true
+  mu_pt_sel:
+    expression: "mu1_pt_raw_g20 && mu2_pt_raw_g20"
+    store: true
+  mu1_ML:
+    expression: "mu1_mediumId{mu_suff} && mu1_pfRelIso04_all{mu_suff} < 0.25"
+    store: true
+  mu2_ML:
+    expression: "mu2_mediumId{mu_suff} && mu2_pfRelIso04_all{mu_suff} < 0.25"
+    store: true
+  bothMuons_ML:
+    expression: "mu1_ML{mu_suff} && mu2_ML{mu_suff}"
+    store: true
+  good_event:
+    expression: "pass_golden_json && pass_met_filters"
+    store: true
+  exactly_2_good_muons:
+    expression: "n_goodMuons == 2"
+    store: true
+  electron_veto:
+    expression: "n_goodElectrons_pt20 == 0"
+    store: true
+  chi2_sel:
+    expression: "mu1_bsConstrainedChi2{mu_suff} < 30 && mu2_bsConstrainedChi2{mu_suff} < 30"
+    store: true
+
+jets_selection:
+  has_good_jets:
+    expression: "N_SelectedJets{jet_suff} >= 0"
+    store: true
+  jets_btag_clean_sel:
+    expression: "SelectedJetTagSel{jet_suff}"
+    store: true
+
+categories:
+  base_sel_muons:
+    expression: "good_event && muons_OS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && bothMuons_ML{mu_suff} && exactly_2_good_muons && electron_veto"
+    store: true
+  # What the tuple keeps (data are in addition blinded in 115-135 GeV by the skim).
+  skim_selection:
+    expression: "base_sel_muons{tot_suff} && mass_50_200"
+    store: true
+  baseline:
+    expression: "base_sel_muons{tot_suff} && SelectedJetTagSel{jet_suff}"
+    store: true
+  base_sel_SS:
+    expression: "muons_SS_presel_trg{mu_suff} && mu_pt_sel{mu_suff} && SelectedJetTagSel{jet_suff}"
+    store: false
+  baseline_SS:
+    expression: "base_sel_SS{tot_suff} && bothMuons_ML{mu_suff}"
+    store: false
+  baseline_chi2:
+    expression: "baseline{tot_suff} && chi2_sel{mu_suff}"
+    store: false
+  VBF_def:
+    expression: "HasVBF_leading{jet_suff}"
+    store: true
+  VBF_def_maxmjj:
+    expression: "HasVBF_maxmjj{jet_suff}"
+    store: true
+  VBF:
+    expression: "baseline{tot_suff} && VBF_def{tot_suff}"
+    store: true
+  ggF:
+    expression: "baseline{tot_suff} && !VBF_def{tot_suff}"
+    store: true
+  ggF_0J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 0"
+    store: true
+  ggF_1J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 1"
+    store: true
+  ggF_2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} == 2"
+    store: true
+  ggF_ge2J:
+    expression: "ggF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+  VBF_ge2J:
+    expression: "VBF{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+  VBF_maxmjj:
+    expression: "baseline{tot_suff} && VBF_def_maxmjj{tot_suff}"
+    store: true
+  ggF_maxmjj:
+    expression: "baseline{tot_suff} && !VBF_def_maxmjj{tot_suff}"
+    store: true
+  VBF_maxmjj_ge2J:
+    expression: "VBF_maxmjj{tot_suff} && N_SelectedJets{jet_suff} >= 2"
+    store: true
+
+# Cumulative analysis steps appended after the skim report JSON cutflow (events with >= 2 good muons and 50 < m_raw < 200
+# are the entries of the first step; the number of NanoAOD events read is `input_events` of the report).
+cutflow:
+  - good_event
+  - muons_trigger
+  - muons_OS
+  - mu_pt_sel
+  - bothMuons_ML
+  - exactly_2_good_muons
+  - electron_veto
+  - base_sel_muons
+  - skim_selection
+  - jets_btag_clean_sel
+  - baseline
+  - VBF_def
+  - VBF
+
+cutflow_vbf_maxmjj:
+  - skim_selection
+  - jets_btag_clean_sel
+  - baseline
+  - VBF_def_maxmjj
+  - VBF_maxmjj

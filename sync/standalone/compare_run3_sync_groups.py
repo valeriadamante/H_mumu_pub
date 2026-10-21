@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import argparse
+import datetime
 import json
 import math
 import re
@@ -36,8 +37,8 @@ import numpy as np  # noqa: E402
 import uproot  # noqa: E402
 
 BASE = Path(os.environ.get("HMUMU_SYNC_BASE", "/eos/cms/store/group/phys_higgs/cmshmm/run3_sync"))   # directory with one folder per group
-CHANNELS = ("ggH", "VBF", "inclusive", "VBF_onlyLeading", "ggH_noVBF_onlyLeading")
-BASE_CHANNELS = ("ggH", "VBF")      # the groups' own categories; the two *_onlyLeading channels are derived from them
+CHANNELS = ("ggH", "VBF", "inclusive")
+BASE_CHANNELS = ("ggH", "VBF")      # the groups' own categories; inclusive = ggH | VBF
 REGIONS = {
     "Z_sideband": (lambda m: (m > 70) & (m < 110), "70 < m(mumu) < 110 GeV"),
     "H_sideband": (lambda m: ((m > 110) & (m < 115)) | ((m > 135) & (m < 150)),
@@ -290,12 +291,18 @@ def treat_Caltech_ntuple():
          "NanoAOD-like = `mu*_bscPt_noCorr`; jets are `leading_jet_*`/`subleading_jet_*`/`diJet_*`.",
          "Channels: `is_ggH_category`/`is_VBF_category` (mutually exclusive) together with `event_pass_muon_trigger_match` and `event_pass_jet_veto`; "
          "this definition of the baseline is our assumption and has to be confirmed by Caltech. There is no b-tag flag/count in the tuple, no MET pT and no charge.",
-         "Data have `gen_weight=-999` (unused); no events in the 115-135 GeV window, i.e. blinded."])
+         "Data have `gen_weight=-999` (unused); no events in the 115-135 GeV window, i.e. blinded.",
+         "Weights: Caltech's `weight` = gen_weight * pileup_weight * xsec[fb] * lumi[fb-1] * mu_trig_eff_SF * mu_ID_eff_SF * mu_ISO_eff_SF / sum(gen_weights); "
+         "checked: it equals our un-normalised product times a constant per sample (VBF 4.177e-06, ggH 1.365e-05). `all_common_weights` is therefore the product without "
+         "the normalisation (like the other groups' un-normalised weights); `weight` is only comparable after dividing by that constant."])
+
+
+IOWA_UPDATE = "update_fullScaRe_21Oct"      # Iowa round 3 (21 Oct, full ScaRe), same schema as update_after_Hmm_15Oct
 
 
 def iowa_files():
     """Iowa publishes per-job files: data = Muon0 + Muon1, VBFH = VBF (no ggH sample)."""
-    d = BASE / "Iowa" / UPDATE
+    d = BASE / "Iowa" / IOWA_UPDATE
     rel = lambda sub: sorted(str(p.relative_to(BASE)) for p in (d / sub).glob("*.root"))
     return {"Data_Run2024H": rel("Muon0") + rel("Muon1"), "VBFH": rel("VBF")}
 
@@ -305,7 +312,7 @@ def treat_Iowa_ntuple():
     base = ("passGolden & passFilters & passHLTAndObjectMatch & passAnalysisMuonSelection & passExactlyTwoAnalysisMuons & passElectronVeto & "
             "passAdditionalLeptonVeto & passJetVetoMap & passBJetVeto & passVertex & analysisPairPassesRawWindow & oppositeSign")
     return GroupSpec(
-        "Iowa", iowa_files() if (BASE / "Iowa" / UPDATE).exists() else {},
+        "Iowa", iowa_files() if (BASE / "Iowa" / IOWA_UPDATE).exists() else {},
         "SyncEvents", "luminosityBlock", "massRaw",
         {"ggH": f"{base} & ~passVBFCategoryApprox", "VBF": f"{base} & passVBFCategoryApprox"},
         {"genWeights": "weightGenerator", "all_common_weights": "weightGenerator*weightPileup*weightMuonIDISO*weightTrigger"},
@@ -423,32 +430,9 @@ TREATERS = {"TAMU": treat_TAMU_ntuple, "Marmara": treat_Marmara_ntuple,
             "PKU": treat_PKU_ntuple, "NNU": treat_NNU_ntuple, "Pisa": treat_Pisa_ntuple, "Purdue": treat_Purdue_ntuple, "MIT": treat_MIT_ntuple, "Caltech": treat_Caltech_ntuple, "Iowa": treat_Iowa_ntuple}
 
 
-LEADING_PT_MIN = 30      # both leading jets, as in Pisa's VBF selection
-LEADING_MJJ_MIN = 400
-LEADING_DETA_MIN = 2.5
-
-
-def add_leading_channels(spec):
-    """inclusive: ggH | VBF of the group.  VBF_onlyLeading: the group's baseline (ggH | VBF) with the VBF requirements applied to the two leading jets only (pT > 30 GeV
-    both, m_jj > 400 GeV, |deta_jj| > 2.5, as Pisa does); ggH_noVBF_onlyLeading: the rest of the baseline.  Built from the group's own
-    jet variables, which are those of the two leading jets (TAMU: `*_ls`, Pisa: Dijet).  For MIT, whose own VBF/ggH
-    selection is already the one on the two leading jets, they are its default VBF and ggH."""
-    v = spec.variables
-    base = f"(({spec.channels['ggH']}) | ({spec.channels['VBF']}))"
-    spec.channels["inclusive"] = base                      # ggH | VBF
-    if spec.name == "MIT":
-        # MIT's own VBF/ggH selection is already the one on the two leading jets (as Pisa's): its defaults are used
-        spec.channels["VBF_onlyLeading"] = spec.channels["VBF"]
-        spec.channels["ggH_noVBF_onlyLeading"] = spec.channels["ggH"]
-        return
-    if any(k not in v for k in ("jet1_pt", "jet2_pt", "mjj", "deta_jj")):
-        spec.channels["VBF_onlyLeading"] = f"({spec.mass} < 0)"
-        spec.channels["ggH_noVBF_onlyLeading"] = f"({spec.mass} < 0)"
-        return
-    vbf = (f"{base} & (({v['jet1_pt']}) > {LEADING_PT_MIN}) & (({v['jet2_pt']}) > {LEADING_PT_MIN}) & "
-           f"(({v['mjj']}) > {LEADING_MJJ_MIN}) & (({v['deta_jj']}) > {LEADING_DETA_MIN})")
-    spec.channels["VBF_onlyLeading"] = vbf
-    spec.channels["ggH_noVBF_onlyLeading"] = f"{base} & ~({vbf})"
+def add_inclusive_channel(spec):
+    """inclusive: ggH | VBF of the group (the leading-jet VBF definition is the standard one: there are no further derived categories)."""
+    spec.channels["inclusive"] = f"(({spec.channels['ggH']}) | ({spec.channels['VBF']}))"
 
 
 # Update after the Hmm meeting of 15 Oct 2026: TAMU, Marmara and Pisa published new tuples in `<group>/update_after_Hmm_15Oct/`
@@ -456,6 +440,7 @@ def add_leading_channels(spec):
 # which is the only mass Pisa stores.  Pisa lost the corrected mass/pT, the MET and Dijet_eta, so those variables are not compared.
 VARIANT = os.environ.get("HMUMU_SYNC_VARIANT", "")
 UPDATE = "update_after_Hmm_15Oct"
+LUMI_2024H = 5440.0       # pb-1, Run2024H
 
 
 def apply_update_variant(spec):
@@ -465,7 +450,18 @@ def apply_update_variant(spec):
         # VBFH: the main production and its _ext1 extension (Pisa's file contains both)
         spec.files["VBFH"] = [spec.files["VBFH"], spec.files["VBFH"].replace(".root", "_ext1.root")]
         spec.mass = "m_mumu_nano"
-        spec.notes.append(f"Tuple of `{UPDATE}`; regions and m_mumu on the raw (NanoAOD) dimuon mass `m_mumu_nano`.")
+        # the tuples published on 19 Oct have weight_lumi = 109,948 pb-1 (all 2024); the data are Run2024H only: patch to LUMI_2024H on reading.
+        # Tuples produced with the 2024H luminosity already have weight_lumi = LUMI_2024H and the factor is 1.
+        spec.weights = {"genWeights": f"weight_generator*({LUMI_2024H}/weight_lumi)",
+                        "all_common_weights": f"weight_generator*({LUMI_2024H}/weight_lumi)*weight_pileup*weight_muon_idiso*weight_trigger"}
+        spec.notes.append(f"Tuple of `{UPDATE}`; regions and m_mumu on the raw (NanoAOD) dimuon mass `m_mumu_nano`. MC weights are scaled to the Run2024H "
+                          f"luminosity ({LUMI_2024H:g} pb-1) on reading (`weight_generator * {LUMI_2024H:g} / weight_lumi`).")
+    elif group == "Caltech":
+        # Caltech `weight` = gen*PU*SF*xsec*lumi/sum(gen) with the lumi of all 2024 (109.82 fb-1): scaled to Run2024H
+        f = "(5440.0/109820.0)"
+        spec.weights = {"genWeights": f"weight/(pileup_weight*mu_trig_eff_SF*mu_ID_eff_SF*mu_ISO_eff_SF)*{f}", "all_common_weights": f"weight*{f}"}
+        spec.notes.append("MC weights: Caltech's `weight` (normalised to all 2024, 109.82 fb-1) times 5.44/109.82, i.e. Run2024H; `genWeights` = `weight` without the PU and muon SF factors. "
+                          "`VBF_skim.root` has 6.83M entries, i.e. it should contain the main production and `ext1`.")
     elif group == "Marmara":
         spec.files = {"Data_Run2024H": f"Marmara/{UPDATE}/tree_DATA_2024_loose_round2.root", "ggH": f"Marmara/{UPDATE}/tree_GGH_2024_loose_round2_upd2_nobtag_weight.root", "VBFH": f"Marmara/{UPDATE}/tree_VBF_2024_loose_round2_upd2_nobtag_weight.root"}
         spec.mass = "mm_mass_raw"
@@ -474,19 +470,62 @@ def apply_update_variant(spec):
         spec.notes.append(f"Tuples of `{UPDATE}` (Data_Run2024H, ggH and VBFH); regions and m_mumu on `mm_mass_raw`.")
     elif group == "NNU":
         d = f"NNU/{UPDATE}/"
-        spec.files = {"Data_Run2024H": d + "NNU-dataH2024.root", "VBFH": d + "NNU-VBFH-Hto2Mu_M125_RunIII2024Summer24_20261020.root"}
+        spec.files = {"Data_Run2024H": d + "NNU-2024Hmuon01_update.root", "ggH": d + "NNU-GluGluH-Hto2Mu_M125_RunIII2024Summer24_update.root",
+                      "VBFH": d + "NNU-VBFH-Hto2Mu_M125_RunIII2024Summer24_update.root"}
         spec.mass = "dimuon_raw_mass"
         base = ("passLumiJSON & passTrigger & passPV & passMETFilters & passTriggerMatch & passRawPreselection & passMuonSelection & "
                 "passThirdLeptonVeto & passBTagVeto")
-        # passJetSelection requires >= 2 jets, so it is left out of the ggH baseline (as stated in NNU's ntuple_info)
-        spec.channels = {"VBF": "passAnalysisSelection", "ggH": f"({base}) & (passAnalysisSelection==0)"}
+        # flaginfo.txt (21 Oct): ggH = baseline (no jet selection) with passVBFKinematics == 0; VBF = passAnalysisSelection
+        spec.channels = {"VBF": "passAnalysisSelection", "ggH": f"({base}) & (passVBFKinematics==0)"}
         spec.weights = {"genWeights": "genWeight", "all_common_weights": "weightBaseNoNorm"}
         spec.flags = ["passLumiJSON", "passTrigger", "passPV", "passMETFilters", "passTriggerMatch", "passRawPreselection", "passMuonSelection",
                       "passThirdLeptonVeto", "passJetSelection", "passBTagVeto", "passVBFKinematics", "passAnalysisSelection"]
         spec.notes = [f"Tuple of `{UPDATE}` (20 Oct): raw-level, regions and m_mumu on `dimuon_raw_mass`, pT on `dimuon_raw_pt`. VBF = `passAnalysisSelection`; "
-                      "ggH = the baseline of the ntuple_info without the jet selection (>= 2 jets) and not `passAnalysisSelection`; this is our reading and "
-                      "has to be confirmed by NNU. There is no ggH sample. Data are blinded on the raw mass; NNU asks to also exclude 115-135 on `dimuon_fsr_mass`, "
+                      "ggH = the baseline of `flaginfo.txt` (no jet selection) with `passVBFKinematics == 0`. Data are blinded on the raw mass; NNU asks to also exclude 115-135 on `dimuon_fsr_mass`, "
                       "which is not needed here because the regions use the raw mass."]
+    elif group == "MIT":
+        d = f"MIT/VBF-GGH/{UPDATE}/snapshot_mc_{{}}_2024_ggHcat_synch.root"
+        spec.files = {"Data_Run2024H": [d.format("-51"), d.format("-52")], "ggH": d.format("11"), "VBFH": d.format("10")}
+        spec.mass = MIT_RAW_MASS
+        spec.channels = {"ggH": "isGGH", "VBF": "~isGGH"}      # MIT (21 Oct): the tuple is ggH + VBF with the flag isGGH; VBF = !isGGH
+        spec.flags = ["isGGH"]
+        # w and w_allSF are per fb-1 (MIT): the weight for the era is w * lumi [fb-1]; here the Run2024H luminosity
+        spec.weights = {"genWeights": f"w*{LUMI_2024H / 1000:g}", "all_common_weights": f"w_allSF*{LUMI_2024H / 1000:g}"}
+        spec.notes = ["Tuple of `update_after_Hmm_15Oct` (21 Oct, 25 branches, tree `events`): ggH + VBF selection with the b-veto relaxed and the extra mu-e veto on; "
+                      "ggH = `isGGH`, VBF = `!isGGH` (as told by MIT). There are no jet or b-tag branches except `nGoodJetsAll`, so only the muon and mass variables are compared. "
+                      "Regions and m_mumu on the raw mass rebuilt from `Muon1/2_rawpt`, eta and phi; `w` and `w_allSF` are per fb-1 (`lumiIntegrated` = 109.82 fb-1 for all 2024): the weights used here are `w` and `w_allSF` times the Run2024H luminosity, 5.44 fb-1. "
+                      "The data are not blinded in 115-135 GeV."]
+    elif group == "PKU":
+        d = f"PKU/{UPDATE}/"
+        spec.files = {k: d + v.split("/", 1)[1] for k, v in spec.files.items()}
+        spec.mass = "H_mass"
+        # PKU `weight` has the same normalisation constant as Caltech's (ggH: 1.3719e-5 vs 1.3653e-5, i.e. all 2024, inferred): scaled to Run2024H
+        spec.weights = {"genWeights": "weight*(5440.0/109820.0)", "all_common_weights": "eventWeight*(5440.0/109820.0)"}
+        spec.channels = {"ggH": "GGH", "VBF": "is_vbf_leading"}      # PKU (21 Oct): `is_vbf_leading` is the VBF selection to use (`is_vbf_maxmjj` is the max-m_jj one)
+        spec.flags = ["trg_single_mu24", "VBF", "GGH", "is_vbf_leading", "is_vbf_maxmjj"]
+        spec.notes.append(f"Tuple of `{UPDATE}` (21 Oct): regions and m_mumu on the raw dimuon mass `H_mass`, pT on `H_pt`. Channels: `GGH` and `is_vbf_leading` (the VBF "
+                          "selection on the two leading jets, as PKU asked; it coincides event by event with the `VBF` flag; `is_vbf_maxmjj` is the max-m_jj selection). The data are not blinded on `H_mass` (415 events in 115-135 GeV "
+                          "in the data file, 1,417 on `diMufsr_kit_BSC_mass`).")
+    elif group == "Purdue":
+        d = f"Purdue/{UPDATE}/Purdue-"
+        spec.files = {"Data_Run2024H": [d + "Muon0_Run2024H-MINIv6NANOv15-v1.root", d + "Muon1_Run2024H-MINIv6NANOv15-v2.root"],
+                      "ggH": d + "GluGluH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8.root",
+                      "VBFH": d + "VBFH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8.root",
+                      "ttH": d + "TTH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8.root",
+                      "ZH": d + "ZH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powhegMINLO-pythia8.root",
+                      "WplusH": d + "WplusH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powhegMINLO-pythia8.root"}
+        spec.mass = "dimuon_mass_raw_agreed"
+        spec.channels = {"ggH": "(pass_agreed_selection == 1) & (cat_ggh_agreed == 1)", "VBF": "(pass_agreed_selection == 1) & (cat_vbf_agreed == 1)"}
+        # wgt_nominal = gen * norm * xsec * lumi * PU * NNLOPS * muID * muIso * muTrig, with lumi = separate_wgt_lumi = 109,820 pb-1 (all 2024): scaled to Run2024H on reading
+        spec.weights = {"genWeights": "separate_wgt_genWeight", "all_common_weights": f"wgt_nominal*({LUMI_2024H}/separate_wgt_lumi)"}
+        spec.flags = ["pass_agreed_selection", "pass_HLT", "pass_trigger_match_agreed", "pass_MET_filters", "pass_PV", "pass_nmuons_agreed", "pass_OS_agreed",
+                      "pass_electron_veto_agreed", "pass_jet_veto_map", "pass_bveto_agreed", "pass_vbf_agreed", "cat_vbf_agreed", "cat_ggh_agreed"]
+        spec.notes = [f"Tuple of `{UPDATE}` (20 Oct, one file per sample, tree `Events`, `sync_info` string inside): raw-level, regions and m_mumu on "
+                      "`dimuon_mass_raw_agreed`, pT on `dimuon_pt_raw`. Channels: `pass_agreed_selection` and `cat_ggh_agreed` / `cat_vbf_agreed` "
+                      "(the category flags alone also fire on events that fail the selection). Data are blinded on the raw mass; the corrected "
+                      "`dimuon_mass` still has events in 115-135 GeV.",
+                      "Muon pT = `mu*_pt` (corrected), NanoAOD-like = `mu*_pt_nano`. Jets are the `*_nominal` leading jets; the VBF cuts of the agreed "
+                      "selection (mjj > 400, |deta| > 2.5, pT 35/30) are applied on the leading and max-mjj pairs."]
     elif group == "Pisa":
         d = f"PISA/{UPDATE}/"
         spec.files = {"Data_Run2024H": [d + "PISA-Muon0_Run2024H-MINIv6NANOv15-v1/Events.root", d + "PISA-Muon1_Run2024H-MINIv6NANOv15-v2/Events.root"],
@@ -509,9 +548,10 @@ def apply_update_variant(spec):
 PISA_UPDATE_VARIABLES = {
     "m_mumu": "Dimuon_rawMass", "pt_mumu": "Dimuon_rawPt", "mu1_pt": None, "mu2_pt": None, "met_pt": None, "met_phi": None,
     "jet1_pt": "LeadingJet_jesPt", "jet2_pt": "SubLeadingJet_jesPt", "eta_jj": None}
-RAW_MASS = {"TAMU": "m_mumu_nano", "Marmara": "mm_mass_raw", "NNU": "dimuon_raw_mass"}
+MIT_RAW_MASS = "sqrt(2*Muon1_rawpt*Muon2_rawpt*(cosh(Muon1_eta-Muon2_eta)-cos(Muon1_phi-Muon2_phi)))"
+RAW_MASS = {"MIT": MIT_RAW_MASS, "PKU": "H_mass", "TAMU": "m_mumu_nano", "Marmara": "mm_mass_raw", "NNU": "dimuon_raw_mass", "Purdue": "dimuon_mass_raw_agreed"}
 # Pisa only publishes the raw dimuon pT in this variant, so `pt_mumu` is the raw one for every group
-RAW_PT = {"TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "Pisa": "Dimuon_rawPt", "NNU": "dimuon_raw_pt"}
+RAW_PT = {"PKU": "H_pt", "TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "Pisa": "Dimuon_rawPt", "NNU": "dimuon_raw_pt", "Purdue": "dimuon_pt_raw"}
 
 
 def treat(group):
@@ -522,16 +562,21 @@ def treat(group):
                 variable.min_jets = 2
     spec = TREATERS[group]()
     spec.variables = {v.name: v.expr[group] for v in VARIABLES if v.expr.get(group)}
-    if VARIANT == UPDATE and group in ("TAMU", "Marmara", "Pisa", "NNU"):
+    if VARIANT == UPDATE and group == "Caltech":
+        apply_update_variant(spec)       # only the Run2024H weights
+    if VARIANT == UPDATE and group in ("TAMU", "Marmara", "Pisa", "NNU", "Purdue", "PKU", "MIT"):
         apply_update_variant(spec)
         if group == "Pisa":
             spec.variables = {k: v for k, v in spec.variables.items() if PISA_UPDATE_VARIABLES.get(k, v) is not None}
             spec.variables.update({k: v for k, v in PISA_UPDATE_VARIABLES.items() if v is not None})
         else:
             spec.variables["m_mumu"] = RAW_MASS[group]
-        spec.variables["pt_mumu"] = RAW_PT[group]
+        if group in RAW_PT:
+            spec.variables["pt_mumu"] = RAW_PT[group]
+        else:
+            spec.variables.pop("pt_mumu", None)
     spec.channels = dict(spec.channels)
-    add_leading_channels(spec)
+    add_inclusive_channel(spec)
     return spec
 
 
@@ -614,6 +659,14 @@ def extract(group, sample, cache_dir):
     spec = treat(group)
     paths = sample_paths(spec, sample)
     cache = cache_dir / f"{group}_{sample}.npz"
+    print(f"[files] {group} {sample}: tree `{spec.tree}`, lumi branch `{spec.lumi_branch}`, mass `{spec.mass}`", flush=True)
+    for p in paths:
+        st = p.stat()
+        print(f"[files]   {p}  ({st.st_size / 1e6:,.0f} MB, modified {datetime.datetime.fromtimestamp(st.st_mtime):%Y-%m-%d %H:%M})", flush=True)
+    for c, e in spec.channels.items():
+        print(f"[files]   channel {c}: {e}", flush=True)
+    for m, e in spec.weights.items():
+        print(f"[files]   weight {m}: {e}", flush=True)
     signature = {"path": str(paths[0]) if len(paths) == 1 else [str(p) for p in paths],
                  "size": paths[0].stat().st_size if len(paths) == 1 else [p.stat().st_size for p in paths],
                  "mtime": paths[0].stat().st_mtime if len(paths) == 1 else [p.stat().st_mtime for p in paths],
@@ -621,11 +674,15 @@ def extract(group, sample, cache_dir):
                  "flags": spec.flags, "version": 2}
     if cache.exists():
         stored = np.load(cache, allow_pickle=True)
-        if json.loads(str(stored["signature"])) == signature:
+        old = json.loads(str(stored["signature"]))
+        old["channels"] = {k: v for k, v in old.get("channels", {}).items() if not k.endswith("onlyLeading")}   # caches written before these channels were removed
+        if old == json.loads(json.dumps(signature)):
+            print(f"[cache] {group} {sample}: using {cache}", flush=True)
             return Extract(group, sample, int(stored["entries"]), stored["full_keys"], stored["keys"], stored["mass"],
                            {k: stored[f"ch_{k}"] for k in CHANNELS}, {k[2:]: stored[k] for k in stored.files if k.startswith("v_")},
                            {k[2:]: stored[k] for k in stored.files if k.startswith("f_")},
                            {k[2:]: stored[k] for k in stored.files if k.startswith("w_")})
+    print(f"[cache] {group} {sample}: not found or outdated ({cache}), reading the ntuple", flush=True)
     trees = [uproot.open(p)[spec.tree] for p in paths]
     present = set(trees[0].keys())
     is_data = sample == "Data_Run2024H"
@@ -635,6 +692,9 @@ def extract(group, sample, cache_dir):
     full, parts = [], []
     entries = sum(t.num_entries for t in trees)
     print(f"[read] {group} {sample}: {entries:,} entries", flush=True)
+    missing = [k for k in spec.variables if k not in usable_vars]
+    print(f"[read] {group} {sample}: {len(usable_vars)} variables, {len(usable_flags)}/{len(spec.flags)} flags found"
+          + (f"; not in the tuple: {', '.join(missing)}" if missing else ""), flush=True)
     chunks = (chunk for tree in trees for chunk in tree.iterate(needed_branches(spec, sample, present), step_size="200 MB", library="ak"))
     for chunk in chunks:
         keys = pack_keys(chunk["run"], chunk[spec.lumi_branch], chunk["event"], is_data)
@@ -666,6 +726,8 @@ def extract(group, sample, cache_dir):
              **{f"v_{k}": v for k, v in out.values.items()}, **{f"f_{k}": v for k, v in out.flags.items()},
              **{f"w_{k}": v for k, v in out.weights.items()})
     print(f"[read] {group} {sample}: kept {len(out.keys):,} events in 70-150 GeV and ggH|VBF", flush=True)
+    print(f"[read] {group} {sample}: {len(out.full_keys):,} unique (run, lumi, event) of {entries:,} rows ({entries - len(out.full_keys):,} duplicates counted once); "
+          + ", ".join(f"{c}: {int(np.count_nonzero(v)):,}" for c, v in out.channel.items()), flush=True)
     return out
 
 
@@ -896,6 +958,29 @@ def explain(r, region, channel, sample, ga, gb):
     return lines
 
 
+def weights_and_branches_markdown(r, region, channel, sample, ga, gb):
+    """Which weight each group's expression uses in each mode, and which native branch/expression is behind every plotted variable."""
+    cell_ = lambda text: f"`{text}`".replace("|", "\\|") if text else "-"
+    out = ["## Weights used", ""]
+    if sample == "Data_Run2024H":
+        out += ["Data: every event has weight 1 for every group (the MC weights below are not used).", ""]
+    else:
+        out += [f"| mode | {ga} | {gb} |", "|---|---|---|"]
+        out += [f"| {m} | {cell_(r['treatment'][ga]['weights'].get(m))} | {cell_(r['treatment'][gb]['weights'].get(m))} |" for m in MC_MODES]
+        out += ["", "`genWeights` is the generator weight only. `all_common_weights` is each group's own product of generator weight and scale factors, as written in the table: "
+                "groups that publish the factors separately are used without cross section, luminosity or sum-of-weights normalisation; groups that publish only a combined weight use it as published. "
+                "The normalisation therefore differs between groups, and the ratio of the sums of weights is not a yield comparison.", ""]
+    modes = r["distributions"].get(region, {}).get(channel)
+    names = list(next(iter(modes.values()))["variables"]) if modes else []
+    if not names:
+        return out
+    va, vb = r["treatment"][ga]["variables"], r["treatment"][gb]["variables"]
+    out += ["## Branches plotted", "", f"| variable | {ga} branch / expression | {gb} branch / expression |", "|---|---|---|"]
+    out += [f"| `{k}` | {cell_(va.get(k))} | {cell_(vb.get(k))} |" for k in names]
+    out += [""]
+    return out
+
+
 def leaf_markdown(r, region, channel, sample, path):
     ga, gb = r["groups"]
     cell = r["cells"][region][channel]
@@ -906,6 +991,7 @@ def leaf_markdown(r, region, channel, sample, path):
     for g in (ga, gb):
         spec = r["treatment"][g]
         out += [f"- **{g}**: mass `{spec['mass']}`, channel `{spec['channels'][channel]}`"]
+    out += ["", *weights_and_branches_markdown(r, region, channel, sample, ga, gb)]
     out += ["", "## Event accounting", "", f"| | {ga} | {gb} |", "|---|---:|---:|",
             f"| events selected | {cell['selected'][ga]:,} | {cell['selected'][gb]:,} |",
             f"| selected by both | {cell['both']:,} | {cell['both']:,} |",

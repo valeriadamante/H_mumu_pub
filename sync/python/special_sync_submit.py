@@ -22,6 +22,24 @@ GGFVBF_DATASETS = DATASETS + (
 )
 
 
+def extension_files(sample):
+    """Files of the _ext1 NanoAOD dataset (second of the sample), from the list or DAS."""
+    datasets = sample.get("nanoAOD", [])
+    extensions = [d for d in datasets if "_ext" in d]
+    if not extensions:
+        raise RuntimeError("sample has no extension dataset")
+    tail = extensions[0].split("/")[2].split("-", 1)[1]
+    files = [path for path in sample.get("filelist", []) if f"/{tail}/" in path]
+    if files:
+        return files
+    result = subprocess.run(["dasgoclient", "-query", f"file dataset={extensions[0]}"],
+                            check=True, capture_output=True, text=True)
+    files = ["root://cms-xrd-global.cern.ch/" + line for line in result.stdout.splitlines() if line]
+    if not files:
+        raise RuntimeError(f"DAS returned no files for {extensions[0]}")
+    return files
+
+
 def requested_files(sample, exact_primary=False):
     """Return files for the requested DAS dataset, querying DAS if needed."""
     files = list(sample.get("filelist", []))
@@ -35,7 +53,7 @@ def requested_files(sample, exact_primary=False):
     if files and len(datasets) == 1:
         return files
     if files:
-        primary_processing = primary.split("/")[2]
+        primary_processing = primary.split("/")[2].split("-", 1)[-1]  # as in the file path: <tail>/<job dir>
         selected = [path for path in files if f"/{primary_processing}/" in path]
         if selected:
             return selected
@@ -61,7 +79,7 @@ def xrootd(path):
 
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--variant", choices=("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013", "ggfvbf_iso_20261014", "ggfvbf_analysis_20261014"),
+    parser.add_argument("--variant", choices=("special_20260923", "filippo_20260925", "ggfvbf_20261015", "ggfvbf_pisa_20261013", "ggfvbf_iso_20261014", "ggfvbf_analysis_20261014", "ggfvbf_update_20261016"),
                         default="special_20260923", help="selection of special_sync_skim.py")
     parser.add_argument("--tag", default=None, help="output folder name (default: the variant)")
     parser.add_argument("--output-root", type=Path, default=path("sync"))
@@ -76,6 +94,9 @@ def arguments():
                              "(default: Muon0_Run2024H and Muon1_Run2024H)")
     parser.add_argument("--mc-lumi-split", action="store_true",
                         help="MC: apply the Run3_2024 event split of the production skim (see special_sync_skim.py)")
+    parser.add_argument("--extension", action="store_true",
+                        help="process the _ext1 NanoAOD dataset of the samples instead of the primary one; "
+                             "output folder <group>-<dataset>_ext1")
     return parser.parse_args()
 
 
@@ -95,11 +116,13 @@ def main():
     extra = "--mc-lumi-split" if args.mc_lumi_split else "none"
     default_datasets = GGFVBF_DATASETS if args.variant.startswith("ggfvbf") else DATASETS
     for dataset in args.dataset or default_datasets:
-        output_dir = (args.output_root / f"{args.group_name}-{dataset}"
+        suffix = "_ext1" if args.extension else ""
+        output_dir = (args.output_root / f"{args.group_name}-{dataset}{suffix}"
                       if args.variant.startswith("ggfvbf")
                       else args.output_root / args.tag / dataset)
         output_dir.mkdir(parents=True, exist_ok=True)
-        files = requested_files(samples[dataset], exact_primary=args.variant.startswith("ggfvbf"))
+        files = (extension_files(samples[dataset]) if args.extension
+                 else requested_files(samples[dataset], exact_primary=args.variant.startswith("ggfvbf")))
         inputs_manifest = (output_dir / "inputs.txt" if args.variant.startswith("ggfvbf")
                            else output_dir.parent / f"{dataset}_inputs.txt")
         inputs_manifest.write_text(
@@ -114,10 +137,11 @@ def main():
         lines = lines[:args.max_jobs]
     # "input" is a Condor submit command (stdin transfer): never use it as a
     # queue variable, Condor would try to copy the NanoAOD file to the node.
-    queue = log_dir / ("jobs_" + "_".join(args.dataset) + ".txt" if args.dataset else "jobs.txt")
+    queue = log_dir / ("jobs_" + "_".join(args.dataset) + suffix + ".txt" if args.dataset else "jobs.txt")
     queue.write_text("\n".join(lines) + "\n")
     submit = queue.with_suffix(".sub")
-    wrapper = "run_special_sync_skim_analysis.sh" if args.variant == "ggfvbf_analysis_20261014" else "run_special_sync_skim.sh"
+    wrapper = {"ggfvbf_analysis_20261014": "run_special_sync_skim_analysis.sh",
+               "ggfvbf_update_20261016": "run_special_sync_skim_update.sh"}.get(args.variant, "run_special_sync_skim.sh")
     submit.write_text(f"""executable = {REPOSITORY}/sync/python/{wrapper}
 arguments = $(proxy) $(repo) $(dataset) $(nanofile) $(outdir) $(job) $(variant) $(extra)
 output = {log_dir}/$(dataset)_$(job).$(ClusterId).$(ProcId).out

@@ -16,7 +16,7 @@ Two steps (full instructions in HOWTO.txt):
   python3 sync_compare.py markdown --round after_15Oct --outdir out      # tables.md with the yield and overlap tables
 
 Rounds (ROUNDS below): before_15Oct = tuples published 12-15 Oct 2026 directly in the group folders (TAMU, Pisa, Marmara, PKU,
-Purdue, MIT, NNU, Caltech); after_15Oct = tuples of <group>/update_after_Hmm_15Oct (TAMU, Pisa, Marmara, Caltech, NNU, Iowa).
+Purdue, MIT, NNU, Caltech); after_15Oct = tuples of <group>/update_after_Hmm_15Oct (TAMU, Pisa, Marmara, Caltech, NNU, Iowa, Purdue, PKU).
 Add --samples ttH ZH WplusH for the other signal samples (TAMU, PKU, Purdue).
 
 A group is one entry of a round in ROUNDS below: the files of every sample, the tree name, the dimuon-mass branch used for the
@@ -135,7 +135,7 @@ ROUNDS = {
                     'ZH': ['TAMU/update_after_Hmm_15Oct/TAMU-ZH_Hto2Mu.root'],
                     'WplusH': ['TAMU/update_after_Hmm_15Oct/TAMU-WplusH_Hto2Mu.root']},
           'channels': {'ggH': 'ggF', 'VBF': 'VBF'},
-          'weights': {'gen': 'weight_generator', 'all': 'weight_generator*weight_pileup*weight_muon_idiso*weight_trigger'}},
+          'weights': {'gen': 'weight_generator*(5440.0/weight_lumi)', 'all': 'weight_generator*(5440.0/weight_lumi)*weight_pileup*weight_muon_idiso*weight_trigger'}},   # published 19 Oct files: weight_lumi = 109,948 pb-1; scaled to Run2024H
  'Pisa': {'tree': 'Events',
           'lumi': 'luminosityBlock',
           'mass': 'Dimuon_rawMass',
@@ -162,31 +162,54 @@ ROUNDS = {
                        'VBFH': ['Caltech/update_after_Hmm_15Oct/VBF_skim.root']},
              'channels': {'ggH': '(is_ggH_category == 1) & event_pass_muon_trigger_match & event_pass_jet_veto',
                           'VBF': '(is_VBF_category == 1) & event_pass_muon_trigger_match & event_pass_jet_veto'},
-             'weights': {'gen': 'gen_weight', 'all': 'gen_weight*pileup_weight*mu_trig_eff_SF*mu_ID_eff_SF*mu_ISO_eff_SF'}},
+             'weights': {'gen': 'weight/(pileup_weight*mu_trig_eff_SF*mu_ID_eff_SF*mu_ISO_eff_SF)*(5.44/109.82)', 'all': 'weight*(5.44/109.82)'}},   # Caltech `weight` is normalised to all 2024 (109.82 fb-1): scaled to Run2024H
  'NNU': {'tree': 'Events',
          'lumi': 'luminosityBlock',
          'mass': 'dimuon_raw_mass',
-         'files': {'Data_Run2024H': ['NNU/update_after_Hmm_15Oct/NNU-dataH2024.root'],
-                   'VBFH': ['NNU/update_after_Hmm_15Oct/NNU-VBFH-Hto2Mu_M125_RunIII2024Summer24_20261020.root']},
+         'files': {'Data_Run2024H': ['NNU/update_after_Hmm_15Oct/NNU-2024Hmuon01_update.root'],
+                   'ggH': ['NNU/update_after_Hmm_15Oct/NNU-GluGluH-Hto2Mu_M125_RunIII2024Summer24_update.root'],
+                   'VBFH': ['NNU/update_after_Hmm_15Oct/NNU-VBFH-Hto2Mu_M125_RunIII2024Summer24_update.root']},
          'channels': {'VBF': 'passAnalysisSelection',
                       'ggH': '(passLumiJSON & passTrigger & passPV & passMETFilters & passTriggerMatch & passRawPreselection & '
                              'passMuonSelection & passThirdLeptonVeto & passBTagVeto) & (passAnalysisSelection==0)'},
          'weights': {'gen': 'genWeight', 'all': 'weightBaseNoNorm'}},
  'MIT': {'tree': 'events', 'lumi': 'luminosityBlock',
-            # no raw-mass branch: built from the raw muon pT (as in the earlier round); the tuple has no jet or b-tag branches,
-            # so only the inclusive channel (every event of the file: ggH+VBF selection with relaxed b-veto) exists
+            # no raw-mass branch: built from the raw muon pT; the tuple has no jet or b-tag branches (ggH+VBF selection with relaxed b-veto)
             'mass': 'sqrt(2*Muon1_rawpt*Muon2_rawpt*(cosh(Muon1_eta-Muon2_eta)-cos(Muon1_phi-Muon2_phi)))',
             'files': {'Data_Run2024H': ['MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_-51_2024_ggHcat_synch.root',
                                         'MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_-52_2024_ggHcat_synch.root'],
                       'ggH': ['MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_11_2024_ggHcat_synch.root'],
                       'VBFH': ['MIT/VBF-GGH/update_after_Hmm_15Oct/snapshot_mc_10_2024_ggHcat_synch.root']},
-            'channels': {'inclusive': 'Muon1_pt > 0'},
-            'weights': {'gen': 'w', 'all': 'w_allSF'}},
+            'channels': {'ggH': 'isGGH', 'VBF': '~isGGH'},     # MIT 21 Oct: ggH = isGGH, VBF = !isGGH
+            'weights': {'gen': 'w*5.44', 'all': 'w_allSF*5.44'}},   # MIT weights are per fb-1: times the Run2024H luminosity (5.44 fb-1)
+ 'PKU': {'tree': 'ntuple',
+         'lumi': 'lumi',
+         'mass': 'H_mass',
+         'files': {'Data_Run2024H': ['PKU/update_after_Hmm_15Oct/Muon_24H.root'],
+                   'ggH': ['PKU/update_after_Hmm_15Oct/GluGluH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
+                   'VBFH': ['PKU/update_after_Hmm_15Oct/VBFH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
+                   'ttH': ['PKU/update_after_Hmm_15Oct/TTH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
+                   'ZH': ['PKU/update_after_Hmm_15Oct/ZH-Hto2Mu_Par-M-125_powhegMINLO_RunIII2024Summer24.root'],
+                   'WplusH': ['PKU/update_after_Hmm_15Oct/WplusH-Hto2Mu_Par-M-125_powhegMINLO_RunIII2024Summer24.root']},
+         'channels': {'ggH': 'GGH', 'VBF': 'is_vbf_leading'},
+         'weights': {'gen': 'weight*(5.44/109.82)', 'all': 'eventWeight*(5.44/109.82)'}},   # PKU `weight` has the same normalisation as Caltech (all 2024, inferred): scaled to Run2024H
+ 'Purdue': {'tree': 'Events',
+            'lumi': 'luminosityBlock',
+            'mass': 'dimuon_mass_raw_agreed',
+            'files': {'Data_Run2024H': ['Purdue/update_after_Hmm_15Oct/Purdue-Muon0_Run2024H-MINIv6NANOv15-v1.root',
+                                        'Purdue/update_after_Hmm_15Oct/Purdue-Muon1_Run2024H-MINIv6NANOv15-v2.root'],
+                      'ggH': ['Purdue/update_after_Hmm_15Oct/Purdue-GluGluH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8.root'],
+                      'VBFH': ['Purdue/update_after_Hmm_15Oct/Purdue-VBFH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8.root'],
+                      'ttH': ['Purdue/update_after_Hmm_15Oct/Purdue-TTH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powheg-pythia8.root'],
+                      'ZH': ['Purdue/update_after_Hmm_15Oct/Purdue-ZH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powhegMINLO-pythia8.root'],
+                      'WplusH': ['Purdue/update_after_Hmm_15Oct/Purdue-WplusH-Hto2Mu_Par-M-125_TuneCP5_13p6TeV_powhegMINLO-pythia8.root']},
+            'channels': {'ggH': '(pass_agreed_selection == 1) & (cat_ggh_agreed == 1)', 'VBF': '(pass_agreed_selection == 1) & (cat_vbf_agreed == 1)'},
+            'weights': {'gen': 'separate_wgt_genWeight', 'all': 'wgt_nominal*(5440.0/separate_wgt_lumi)'}},   # wgt_nominal has lumi = 109,820 pb-1 (all 2024): scaled to Run2024H
  'Iowa': {'tree': 'SyncEvents',
           'lumi': 'luminosityBlock',
           'mass': 'massRaw',
-          'files': {'Data_Run2024H': ['Iowa/update_after_Hmm_15Oct/Muon0/*.root', 'Iowa/update_after_Hmm_15Oct/Muon1/*.root'],
-                    'VBFH': ['Iowa/update_after_Hmm_15Oct/VBF/*.root']},
+          'files': {'Data_Run2024H': ['Iowa/update_fullScaRe_21Oct/Muon0/*.root', 'Iowa/update_fullScaRe_21Oct/Muon1/*.root'],
+                    'VBFH': ['Iowa/update_fullScaRe_21Oct/VBF/*.root']},
           'channels': {'ggH': 'passGolden & passFilters & passHLTAndObjectMatch & passAnalysisMuonSelection & passExactlyTwoAnalysisMuons '
                               '& passElectronVeto & passAdditionalLeptonVeto & passJetVetoMap & passBJetVeto & passVertex & '
                               'analysisPairPassesRawWindow & oppositeSign & ~passVBFCategoryApprox',

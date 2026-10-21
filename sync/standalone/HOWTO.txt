@@ -3,9 +3,9 @@ HOW TO RECREATE THE YIELD TABLES AND PLOTS OF THE RUN 3 H->MUMU SYNCHRONISATION
 2024 data (Run2024H) and ggH / VBFH signal (ttH, ZH, WplusH where published). Two rounds of ntuples are covered:
   before_15Oct  tuples published 12-15 Oct 2026 directly in the group folders: TAMU, Pisa, Marmara, PKU, Purdue, MIT, NNU, Caltech
                 (corrected dimuon mass; Caltech: its first small skim of 15 Oct)
-  after_15Oct   tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass): TAMU, Pisa, Marmara, Caltech, NNU, Iowa, MIT
-                (MIT: path MIT/VBF-GGH/update_after_Hmm_15Oct, inclusive channel only)
-Choose the round with --round (default after_15Oct). Every command below accepts it.
+  after_15Oct   tuples of <group>/update_after_Hmm_15Oct (raw dimuon mass): TAMU, Pisa, Marmara, Caltech, NNU, Iowa (folder update_fullScaRe_21Oct),
+                Purdue, PKU, MIT (path MIT/VBF-GGH/update_after_Hmm_15Oct)
+Choose the round with --round (default after_15Oct). For compare_run3_sync_groups.py export HMUMU_SYNC_VARIANT=update_after_Hmm_15Oct. Every command below accepts it.
 
 Everything is done by ONE file, sync_compare.py. It needs no analysis framework and no CMSSW.
 
@@ -35,8 +35,9 @@ The dictionary ROUNDS at the top of sync_compare.py says, for each round and gro
   mass     branch with the dimuon mass used to define the regions: the corrected (FSR/scale) mass in before_15Oct,
            the RAW uncorrected mass in after_15Oct. The data are blinded in 115-135 GeV on this mass
   channels one boolean expression for ggH and one for VBF (what the group calls its ggH / VBF event); the channel 'inclusive'
-           (ggH or VBF) is built automatically, or given directly for a group that only has an inclusive selection (MIT)
-  weights  gen = generator weight only, all = generator * pileup * muon ID/iso * trigger (no b-tag SF, no lumi/xs factor)
+           (ggH or VBF) is built automatically
+  weights  gen = generator weight only, all = generator * pileup * muon ID/iso * trigger (no b-tag SF); MC weights are normalised to the Run2024H luminosity, 5.44 fb-1, where the
+           group's tuple is normalised (TAMU, MIT, Purdue, Caltech, PKU are rescaled on reading; Pisa, NNU, Iowa are un-normalised)
 
 Channel definitions used in after_15Oct (our reading of every tuple, to be confirmed by the owners; the before_15Oct ones are in ROUNDS):
   TAMU     flags ggF / VBF (both include the baseline selection and the b-veto)
