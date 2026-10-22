@@ -495,14 +495,13 @@ def apply_update_variant(spec):
     elif group == "PKU":
         d = f"PKU/{UPDATE}/"
         spec.files = {k: d + v.split("/", 1)[1] for k, v in spec.files.items()}
-        spec.mass = "H_mass"
+        spec.mass = "diMu_BSC_mass"      # PKU (22 Oct): they cut and blind on the beam-spot-constrained dimuon mass `diMu_BSC_mass`
         # PKU `weight` has the same normalisation constant as Caltech's (ggH: 1.3719e-5 vs 1.3653e-5, i.e. all 2024, inferred): scaled to Run2024H
         spec.weights = {"genWeights": "weight*(5440.0/109820.0)", "all_common_weights": "eventWeight*(5440.0/109820.0)"}
         spec.channels = {"ggH": "GGH", "VBF": "is_vbf_leading"}      # PKU (21 Oct): `is_vbf_leading` is the VBF selection to use (`is_vbf_maxmjj` is the max-m_jj one)
         spec.flags = ["trg_single_mu24", "VBF", "GGH", "is_vbf_leading", "is_vbf_maxmjj"]
-        spec.notes.append(f"Tuple of `{UPDATE}` (21 Oct): regions and m_mumu on the raw dimuon mass `H_mass`, pT on `H_pt`. Channels: `GGH` and `is_vbf_leading` (the VBF "
-                          "selection on the two leading jets, as PKU asked; it coincides event by event with the `VBF` flag; `is_vbf_maxmjj` is the max-m_jj selection). The data are not blinded on `H_mass` (415 events in 115-135 GeV "
-                          "in the data file, 1,417 on `diMufsr_kit_BSC_mass`).")
+        spec.notes.append(f"Tuple of `{UPDATE}` (21 Oct): regions and m_mumu on the beam-spot-constrained dimuon mass `diMu_BSC_mass` (the mass PKU cuts and blinds on; 22 Oct), pT on `diMu_BSC_pt`. Channels: `GGH` and `is_vbf_leading` (the VBF "
+                          "selection on the two leading jets, as PKU asked; it coincides event by event with the `VBF` flag; `is_vbf_maxmjj` is the max-m_jj selection). The data are blinded on `diMu_BSC_mass` (0 events in 115-135 GeV), not on the other mass definitions (`H_mass` 415, `diMufsr_kit_BSC_mass` 1,417 events in the window). Weights (PKU, 22 Oct): `eventWeight` = generator x pile-up x muon ID and iso scale factors (no trigger SF), `weight` = the per-sample constant that scales to the lumi of all 2024; both rescaled to Run2024H with 5440/109820, so `genWeights` (`weight`) has no generator-weight sign.")
     elif group == "Purdue":
         d = f"Purdue/{UPDATE}/Purdue-"
         spec.files = {"Data_Run2024H": [d + "Muon0_Run2024H-MINIv6NANOv15-v1.root", d + "Muon1_Run2024H-MINIv6NANOv15-v2.root"],
@@ -546,9 +545,9 @@ PISA_UPDATE_VARIABLES = {
     "m_mumu": "Dimuon_rawMass", "pt_mumu": "Dimuon_rawPt", "mu1_pt": None, "mu2_pt": None, "met_pt": None, "met_phi": None,
     "jet1_pt": "LeadingJet_jesPt", "jet2_pt": "SubLeadingJet_jesPt", "eta_jj": None}
 MIT_RAW_MASS = "sqrt(2*Muon1_rawpt*Muon2_rawpt*(cosh(Muon1_eta-Muon2_eta)-cos(Muon1_phi-Muon2_phi)))"
-RAW_MASS = {"MIT": MIT_RAW_MASS, "PKU": "H_mass", "TAMU": "m_mumu_nano", "Marmara": "mm_mass_raw", "NNU": "dimuon_raw_mass", "Purdue": "dimuon_mass_raw_agreed"}
+RAW_MASS = {"MIT": MIT_RAW_MASS, "PKU": "diMu_BSC_mass", "TAMU": "m_mumu_nano", "Marmara": "mm_mass_raw", "NNU": "dimuon_raw_mass", "Purdue": "dimuon_mass_raw_agreed"}
 # Pisa only publishes the raw dimuon pT in this variant, so `pt_mumu` is the raw one for every group
-RAW_PT = {"PKU": "H_pt", "TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "Pisa": "Dimuon_rawPt", "NNU": "dimuon_raw_pt", "Purdue": "dimuon_pt_raw"}
+RAW_PT = {"PKU": "diMu_BSC_pt", "TAMU": "pt_mumu_nano", "Marmara": "mm_pt_uncorr", "Pisa": "Dimuon_rawPt", "NNU": "dimuon_raw_pt", "Purdue": "dimuon_pt_raw"}
 
 
 def treat(group):
@@ -668,11 +667,12 @@ def extract(group, sample, cache_dir):
                  "size": paths[0].stat().st_size if len(paths) == 1 else [p.stat().st_size for p in paths],
                  "mtime": paths[0].stat().st_mtime if len(paths) == 1 else [p.stat().st_mtime for p in paths],
                  "variables": spec.variables, "channels": spec.channels, "weights": spec.weights,
-                 "flags": spec.flags, "version": 2}
+                 "flags": spec.flags, "mass": spec.mass, "version": 2}
     if cache.exists():
         stored = np.load(cache, allow_pickle=True)
         old = json.loads(str(stored["signature"]))
         old["channels"] = {k: v for k, v in old.get("channels", {}).items() if not k.endswith("onlyLeading")}   # caches written before these channels were removed
+        old.setdefault("mass", None if group == "PKU" else spec.mass)     # caches written before the mass was part of the signature (PKU changed its mass on 22 Oct)
         if old == json.loads(json.dumps(signature)):
             print(f"[cache] {group} {sample}: using {cache}", flush=True)
             return Extract(group, sample, int(stored["entries"]), stored["full_keys"], stored["keys"], stored["mass"],
@@ -1273,19 +1273,24 @@ def write_pair_summary(output, ga, gb):
 # All groups on the same plot
 # ----------------------------------------------------------------------------------------------
 
-def draw_all(hists, bins, title, heading, out):
-    """hists: ordered {group: (histogram, entries)}; the ratio is to the first group."""
+def draw_all(hists, bins, title, heading, out, with_ratio=True):
+    """hists: ordered {group: (histogram, entries)}; the ratio panel (if `with_ratio`) is to the first group."""
     width = np.diff(bins)
     densities = {g: (h / h.sum() / width if h.sum() else h, n) for g, (h, n) in hists.items()}
     reference = next(iter(densities))
-    fig, (ax, rax) = plt.subplots(2, 1, figsize=(7.5, 7.5), sharex=True, gridspec_kw={"height_ratios": [3, 1], "hspace": .05})
+    if with_ratio:
+        fig, (ax, rax) = plt.subplots(2, 1, figsize=(7.5, 7.5), sharex=True, gridspec_kw={"height_ratios": [3, 1], "hspace": .05})
+    else:
+        fig, ax = plt.subplots(figsize=(7.5, 5.5))
+        rax = None
     centres = 0.5 * (bins[1:] + bins[:-1])
-    rax.axhline(1, color="black", linewidth=.8)
+    if with_ratio:
+        rax.axhline(1, color="black", linewidth=.8)
     spread = 0.
     for i, (g, (y, n)) in enumerate(densities.items()):
         h_g = hists[g][0]
         ax.stairs(h_g / h_g.sum() * n if h_g.sum() else h_g, bins, label=f"{g} ({n:,})", linewidth=1.7, color=f"C{i}")
-        if g == reference:
+        if g == reference or not with_ratio:
             continue
         yr = densities[reference][0]
         ratio = np.divide(y, yr, out=np.full_like(y, np.nan), where=(y > 0) & (yr > 0))
@@ -1293,30 +1298,34 @@ def draw_all(hists, bins, title, heading, out):
         if finite.size:
             spread = max(spread, float(np.max(np.abs(finite - 1))))
         rax.errorbar(centres + 0.0, ratio, xerr=width / 2, fmt="o", color=f"C{i}", markersize=3, linestyle="none", elinewidth=1)
-    ratio_axis(rax, spread)
+    if with_ratio:
+        ratio_axis(rax, spread)
     ax.set_ylabel("events / bin" if heading.endswith("unweighted") else "weighted events / bin")
     ax.set_title(heading, fontsize=10)
     ax.legend()
-    rax.set_ylabel(f"group / {reference}\n(shapes)")
-    rax.set_xlabel(title)
+    if with_ratio:
+        rax.set_ylabel(f"group / {reference}\n(shapes)")
+        rax.set_xlabel(title)
+    else:
+        ax.set_xlabel(title)
     fig.savefig(out.with_suffix(".png"), dpi=130, bbox_inches="tight")
     fig.savefig(out.with_suffix(".pdf"), bbox_inches="tight")
     plt.close(fig)
 
 
-def compare_all_groups(sample, output, cache_dir, regions, channels, groups, folder_name="ALL_GROUPS"):
+def compare_all_groups(sample, output, cache_dir, regions, channels, groups):
     """Every group that provides the sample on one plot per variable, region, channel and weight mode."""
     present = [g for g in groups if sample in treat(g).files]
     if len(present) < 2:
         return None
     extracts = {g: extract(g, sample, cache_dir) for g in present}
-    root = output / folder_name / sample
+    root = output / sample
     root.mkdir(parents=True, exist_ok=True)
     info = {"sample": sample, "groups": present, "cells": {}}
-    out = [f"# {'All groups together' if folder_name == 'ALL_GROUPS' else folder_name.replace('_VS_OTHERS', ' against all the other groups')}: {sample}", "",
+    out = [f"# All groups together: {sample}", "",
            f"Groups: {', '.join(present)}. Every plot overlays the events per bin of each group (MC: A.U., weighted shape scaled to the selected events); the ratio panel compares the unit-normalised shapes and is to **{present[0]}**. "
            "Every group uses its own definition of the channel and of the corrected mass (see the pair reports for the details). "
-           "The plots in `<mode>/` have the ratio panel to the first group; `<mode>/ratio_to_<GROUP>/` has the same plots with the ratio to each other group.", ""]
+           "Plots are in `<region>/<channel>/<mode>/`: `no_ratio/` has the overlay of every variable without ratio panel, `ratio_to_<GROUP>/` one folder per group with the ratio panel to that group.", ""]
     for region in regions:
         for channel in channels:
             selections = {g: selection(e, region, channel) for g, e in extracts.items()}
@@ -1349,11 +1358,11 @@ def compare_all_groups(sample, output, cache_dir, regions, channels, groups, fol
                     reference = next(iter(hists))
                     d = {g: distance(hists[reference][0], h) for g, (h, _) in hists.items() if g != reference}
                     table.append((v.name, reference, d))
-                    draw_all(hists, v.bins, v.title, f"{sample} - {region} - {channel} - {mode}", folder / v.name)
-                    # the same plot with the ratio panel to each of the other groups
+                    nr = folder / "no_ratio"
+                    nr.mkdir(exist_ok=True)
+                    draw_all(hists, v.bins, v.title, f"{sample} - {region} - {channel} - {mode}", nr / v.name, with_ratio=False)
+                    # the overlay with the ratio panel to each group (the table below uses the first group)
                     for other in hists:
-                        if other == reference:
-                            continue
                         sub = folder / f"ratio_to_{other}"
                         sub.mkdir(exist_ok=True)
                         ordered = {other: hists[other], **{g: h for g, h in hists.items() if g != other}}
@@ -1364,7 +1373,7 @@ def compare_all_groups(sample, output, cache_dir, regions, channels, groups, fol
                     out += [f"Shape distance to {present[0]} (0 identical, 1 disjoint), {mode}:", "",
                             "| variable | " + " | ".join(others) + " | plot |", "|---|" + "---:|" * len(others) + "---|"]
                     for name, _, d in sorted(table, key=lambda t: -max([x for x in t[2].values() if math.isfinite(x)] or [0])):
-                        out.append(f"| `{name}` | " + " | ".join(fmt(d.get(g)) for g in others) + f" | [png]({region}/{channel}/{mode}/{name}.png) |")
+                        out.append(f"| `{name}` | " + " | ".join(fmt(d.get(g)) for g in others) + f" | [png]({region}/{channel}/{mode}/ratio_to_{present[0]}/{name}.png) |")
                     out.append("")
     (root / "SUMMARY.md").write_text("\n".join(out) + "\n")
     (root / "overlay.json").write_text(json.dumps(info, indent=2) + "\n")
@@ -1382,8 +1391,7 @@ def main():
     p.add_argument("--channel", action="append", choices=CHANNELS)
     p.add_argument("--resume", action="store_true", help="keep pair/sample directories that already have a summary.json")
     p.add_argument("--summaries-only", action="store_true", help="rewrite the pair summaries and the root index from the existing summary.json files")
-    p.add_argument("--reference", choices=TREATERS, help="one group against all the others: only the overlay plots, with the ratio panels "
-                   "to this group, written in <OUTPUT>/<REFERENCE>_VS_OTHERS/ (no pairwise comparison)")
+    p.add_argument("--overlay-only", action="store_true", help="only the all-groups overlay plots, written in <OUTPUT>/<sample>/ (no pairwise comparison)")
     p.add_argument("--no-overlay", action="store_true", help="skip the all-groups overlay plots")
     p.add_argument("--list", action="store_true", help="list the groups, samples and pairs and exit")
     a = p.parse_args()
@@ -1392,15 +1400,13 @@ def main():
     if a.group1 and a.group1 == a.group2:
         p.error("--group1 and --group2 must differ")
     groups = list(TREATERS)
-    if a.reference:
+    if a.overlay_only:
         if not a.output:
             p.error("--output is required")
         a.output.mkdir(parents=True, exist_ok=True)
-        ordered = [a.reference] + [g for g in groups if g != a.reference]
-        for s in sorted({s for g in groups for s in treat(g).files if not a.sample or s in a.sample}):
-            print(f"[reference {a.reference}] {s}", flush=True)
-            compare_all_groups(s, a.output, a.cache_dir, a.region or list(REGIONS), a.channel or list(CHANNELS), ordered,
-                               f"{a.reference}_VS_OTHERS")
+        for s_ in sorted({s_ for g in groups for s_ in treat(g).files if not a.sample or s_ in a.sample}):
+            print(f"[overlay] {s_}", flush=True)
+            compare_all_groups(s_, a.output, a.cache_dir, a.region or list(REGIONS), a.channel or list(CHANNELS), groups)
         return
     pairs = [(a.group1, a.group2)] if a.group1 else [(x, y) for i, x in enumerate(groups) for y in groups[i + 1:]]
     work = [(x, y, s) for x, y in pairs for s in sorted(set(treat(x).files) & set(treat(y).files)) if not a.sample or s in a.sample]
@@ -1424,7 +1430,7 @@ def main():
     if not a.group1 and not a.summaries_only and not a.no_overlay:
         for s in sorted({s for g in groups for s in treat(g).files if not a.sample or s in a.sample}):
             print(f"[overlay] {s}", flush=True)
-            compare_all_groups(s, a.output, a.cache_dir, a.region or list(REGIONS), a.channel or list(CHANNELS), groups)
+            compare_all_groups(s, a.output / "all_groups", a.cache_dir, a.region or list(REGIONS), a.channel or list(CHANNELS), groups)
     write_root_summary(a.output)
 
 

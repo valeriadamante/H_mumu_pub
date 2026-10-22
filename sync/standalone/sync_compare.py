@@ -26,6 +26,8 @@ Expressions are Python expressions on branch names (with abs, sqrt, hypot, cos, 
 import argparse
 import csv
 import glob
+import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -184,7 +186,7 @@ ROUNDS = {
             'weights': {'gen': 'w*5.44', 'all': 'w_allSF*5.44'}},   # MIT weights are per fb-1: times the Run2024H luminosity (5.44 fb-1)
  'PKU': {'tree': 'ntuple',
          'lumi': 'lumi',
-         'mass': 'H_mass',
+         'mass': 'diMu_BSC_mass',
          'files': {'Data_Run2024H': ['PKU/update_after_Hmm_15Oct/Muon_24H.root'],
                    'ggH': ['PKU/update_after_Hmm_15Oct/GluGluH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
                    'VBFH': ['PKU/update_after_Hmm_15Oct/VBFH-Hto2Mu_Par-M-125_powheg_RunIII2024Summer24.root'],
@@ -318,16 +320,25 @@ def read_sample(base, spec, sample, step_size=500_000):
     return result
 
 
+def cache_signature(base, group, sample):
+    """What the cached selection depends on: the group definition (branches, channels, weights) and the size/mtime of its files."""
+    spec = GROUPS[group]
+    files = [(str(path), os.stat(path).st_size, int(os.stat(path).st_mtime)) for path in sample_files(base, spec, sample)]
+    return json.dumps({"spec": spec, "files": files}, sort_keys=True, default=str)
+
+
 def load_or_read(base, group, sample, outdir):
-    """Read the ntuple once; the selected events are cached in <outdir>/cache/<group>_<sample>.npz."""
+    """Read the ntuple once; the selected events are cached in <outdir>/cache/<group>_<sample>.npz and reused only if the group definition and the input files are unchanged."""
     cache = Path(outdir) / "cache" / ROUND / f"{group}_{sample}.npz"
+    signature = cache_signature(base, group, sample)
     if cache.exists():
         d = dict(np.load(cache))
-        if "inclusive" not in d:          # caches written before the inclusive channel existed
-            d["inclusive"] = d["ggH"] | d["VBF"]
-        return d
+        if str(d.get("signature", "")) == signature:
+            return d
+        print(f"[cache] {ROUND} {group} {sample}: definition or input files changed, read again", flush=True)
     print(f"[read] {ROUND} {group} {sample}", flush=True)
     result = read_sample(base, GROUPS[group], sample)
+    result["signature"] = np.array(signature)
     cache.parent.mkdir(parents=True, exist_ok=True)
     np.savez(cache, **result)
     return result
@@ -338,7 +349,7 @@ def deduplicate(d):
     `duplicates` is the number of rows dropped; for VBFH (main + ext1) a few identical identifiers of distinct events (<0.01%) are dropped too."""
     _, index = np.unique(d["key"], return_index=True)
     index = np.sort(index)
-    out = {k: v[index] for k, v in d.items() if k != "entries"}
+    out = {k: v[index] for k, v in d.items() if k not in ("entries", "signature")}
     out["entries"] = d["entries"]
     out["duplicates"] = np.array(len(d["key"]) - len(index))
     return out
